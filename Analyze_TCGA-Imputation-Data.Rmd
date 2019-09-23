@@ -1,0 +1,172 @@
+---
+title: "Analyzing TCGA (patient) Imputation Data"
+output: html_notebook
+---
+
+Analysis outline: 
+
+  * Install TCGAbiolinks to get TCGA clinical data
+  * Format BRCA predictions, merge with clinical data
+  * Perform t-tests and correct for multiple testing 
+
+
+```{r install packages, include= FALSE}
+
+if (!requireNamespace("TCGAbiolinks", quietly = TRUE))
+    BiocManager::install("TCGAbiolinks")
+
+if (!requireNamespace("broom", quietly = TRUE))
+    install.packages("broom")
+
+
+library(TCGAbiolinks)
+library(tidyverse)
+library(broom)
+library(readxl)
+
+
+query <- GDCquery(project = "TCGA-BRCA", 
+                  data.category = "Clinical",
+                  data.type = "Clinical Supplement", 
+                  data.format = "BCR Biotab")
+GDCdownload(query)
+clinical.BCRtab.all <- GDCprepare(query)
+names(clinical.BCRtab.all)
+BRCA_clinical <- clinical.BCRtab.all$clinical_patient_brca %>%
+    dplyr::select(bcr_patient_barcode, er_status_by_ihc, er_status_ihc_Percent_Positive, pr_status_by_ihc, 
+                  pr_status_ihc_percent_positive, her2_status_by_ihc, her2_fish_status, ) %>%
+    dplyr::slice(-1:-2) %>% 
+    type_convert() %>% 
+    mutate(HER2_Subtype = if_else(condition = her2_fish_status %in% c("Positive", "Negative"), her2_fish_status, her2_status_by_ihc)) %>% 
+    filter(er_status_by_ihc %in% c("Positive", "Negative"), 
+           pr_status_by_ihc %in% c("Positive", "Negative"), 
+           HER2_Subtype %in% c("Positive", "Negative")) %>% 
+    mutate(Clin_Subtype = if_else(condition = er_status_by_ihc == "Positive" | pr_status_by_ihc == "Positive", 
+                                  true = if_else(condition = HER2_Subtype == "Positive", true = "ER/PR+, HER2+", false = "ER/PR+"),
+                                  false = if_else(condition = HER2_Subtype == "Positive", true = "HER2+", false = "TNBC"))) %>% 
+    mutate(TNBC_status = if_else(Clin_Subtype == "TNBC", "TNBC", "RPBC"))
+
+table(BRCA_clinical$Clin_Subtype)
+
+#TCGA_subs <- TCGAquery_subtype(tumor = "brca") #easily get TCGA PAM50 status this way
+
+######################## note ###################
+#####I could look into doing the KI-67 subtyping to futher delineate the ER/PR+ samples, but TCGA doesn't have KI-67 staining. I could potentially use expression, which is what I have below, but the cutoff wouldn't be clear (expression isn't used clinically), so I have opted to skip it for now. 
+# tpmDatMat <- read.delim(file = "./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt", as.is=T)
+# tpmDatMat <- tpmDatMat[c(1,grep(pattern = "MKI67", x = tpmDatMat[,"Hybridization.REF"])),]
+# tpmDatMat_tpm <- tpmDatMat[-1,which(tpmDatMat[1,] == "scaled_estimate")]
+# tpmDatMat_tpm <- apply(tpmDatMat_tpm, 2, as.numeric)
+# geneNames <- do.call(cbind, strsplit(tpmDatMat[, "Hybridization.REF"], "|", fixed=TRUE))[1,][-1]
+# rownames(tpmDatMat_tpm) <- geneNames
+# colnames(tpmDatMat_tpm) <- gsub("\\.", "-", x = substr(colnames(tpmDatMat_tpm), 1, 16))
+# tpmDatMat_tpm_logged <- log((tpmDatMat_tpm*1000000)+1) # transform the data
+# tpmDatMat_tpm_logged <- tpmDatMat_tpm_logged[,-grep(pattern = ".11A.|.11B.|.10A.|.10B.", colnames(tpmDatMat_tpm_logged))]
+# KI67_expression <- t(tpmDatMat_tpm_logged) %>% as_tibble(rownames = "bcr_patient_barcode") %>%
+#     mutate(bcr_patient_barcode = substr(bcr_patient_barcode, 1, 12))
+# 
+# BRCA_clin_ki67 <- left_join(BRCA_clinical, KI67_expression)
+# 
+# BRCA_clin_ki67 %>%
+#     filter(Clin_Subtype == "ER/PR+") %>%
+#     filter(MKI67 < 1.8)
+
+```
+
+This table shows the clinical breakdown by clinical subtype. 
+
+```{r}
+table(BRCA_clinical$Clin_Subtype)
+
+```
+
+Ki-67 staining is not available, so we cannot do the traditional Lum A and Lum B demarcation. 
+
+### Prediction and Purity Data
+
+```{r format predictions, include = FALSE}
+load("./DataOut/2019-GDSC2_TCGA-BRCA_PREDS_matrix.RData")
+BRCA_preds <- as_tibble(t(GDSCDrugPredictions_mat), rownames = "Patient_ID") 
+BRCA_preds <- BRCA_preds %>% 
+  filter(grepl(Patient_ID, pattern = "\\.01A\\.|\\.01B\\.")) %>% 
+  mutate(Patient_ID = gsub(x = strtrim(Patient_ID, width = 12), pattern = "\\.", replacement = "-")) %>% 
+  gather(key = "Drug", value = "PSS", -Patient_ID)
+
+#join with clinical information
+preds.subtype <- left_join(BRCA_preds, BRCA_clinical, by = c("Patient_ID" = "bcr_patient_barcode")) %>% 
+  drop_na(TNBC_status)
+
+#filter out tumors with low tumor purity
+  #purity data from Aran, D. et al. Systematic pan-cancer analysis of tumour purity. Nat. Commun. 6:8971 doi: 10.1038/ncomms9971 (2015).
+  #Downloaded and placed in repo separately . 
+
+download.file(url = "https://static-content.springer.com/esm/art%3A10.1038%2Fncomms9971/MediaObjects/41467_2015_BFncomms9971_MOESM1236_ESM.xlsx", destfile = "./DataIn/TCGA/Tumor-purity_Aran_2015.xlsx", mode = "wb")
+
+tumor_purity <- read_xlsx("./DataIn/TCGA/Tumor-purity_Aran_2015.xlsx", skip = 3, na = "NaN")
+
+pure_preds_subtype <- tumor_purity %>% 
+  filter(`Cancer type` == "BRCA") %>% 
+  mutate(`Sample ID` = strtrim(`Sample ID`, 12)) %>% 
+  right_join(., preds.subtype, by = c("Sample ID" = "Patient_ID"))
+  
+
+```
+
+We can obtain purity information by subtype to make sure that one subtype isn't more effected if we use a purity cutoff. 
+
+```{r Tumor Purity Exploration}
+pure_preds_subtype %>% 
+  select(-Drug, -PSS) %>% 
+  distinct() %>% 
+  ggplot() + 
+    geom_boxplot(aes(x = Clin_Subtype, y = CPE))
+
+```
+
+We can subset the predictions and perform t-test. We can also see if filtering has any effect on the number of significant results. 
+
+```{r Statistical testing}
+# aov_preds.subtype <- preds.subtype %>% 
+#   group_by(Drug) %>% 
+#   do(tidy(aov(.$PSS ~ .$PAM50))) %>% 
+#   filter(term == ".$PAM50") %>% 
+#   mutate(bonf_p.value = p.adjust(p.value))
+
+t.tst_preds.subtype <- preds.subtype %>% 
+  group_by(Drug) %>% 
+  do(tidy(t.test(PSS~TNBC_status, data = .))) %>%
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value))
+
+  
+t.tst_preds.subtype %>% ungroup() %>% mutate(Sensitive = if_else(estimate > 0, "TNBC", "RPBC")) %>% count(Sensitive)
+
+CPE_test <- 1:9/10
+
+for (i in 1:9){
+  
+t.tst_pure_preds.subtype <- pure_preds_subtype %>% 
+  filter(CPE > CPE_test[i]) %>% 
+  group_by(Drug) %>% 
+  do(tidy(t.test(PSS~TNBC_status, data = .))) %>%
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value))
+
+writeLines(paste("Breakdown of number of samples that reach threshold of at least ", i*10, "% Pure", sep =""))
+print(
+  pure_preds_subtype %>% 
+  select(-Drug, -PSS) %>% 
+  distinct() %>% 
+  filter(CPE > CPE_test[i]) %>% 
+  count(Clin_Subtype)
+)
+
+writeLines(paste("Significance breakdown when you require tumors to be at least out ", i*10, "% Pure", sep = ""))
+print(t.tst_pure_preds.subtype %>% mutate(Sensitive = if_else(estimate > 0, "TNBC", "RPBC")) %>% count(bonf_p.value <0.05, Sensitive))
+
+}
+
+
+
+```
+
+

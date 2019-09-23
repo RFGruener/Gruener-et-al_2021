@@ -1,0 +1,106 @@
+---
+title: "Download GDSC and CTRP Data"
+output: html_notebook
+---
+
+## Objectives:
+
+The goal of this file is to: download and install the necessary packages and files into the R project. Specifically: 
+
+ * Install pRRophetic and it's dependencies
+ * Download the cell line screening data
+ * Download the RNA-Seq information
+ * Download the TCGA dataset
+ 
+Important note, certain files are already included in this parent directory including "pRRophetic_0.5.tar.gz" , "All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Particularly for the first two files listed, they are needed to run the imputations and should be downloaded separately.   
+
+
+### Installing required packages (pRRophetic must be downloaded and put in wd or project home)
+
+Again to install pRRophetic, it will need to be downloaded and placed in the repo manually/separately. 
+
+```{r install and load pRRophetic and dependencies, results= "hide"}
+
+#install BiocManager if needed
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+#install pRRophetic dependencies if needed
+if (!requireNamespace(c("car", "ridge", "preprocessCore", "genefilter", "sva"), quietly = TRUE)) 
+    BiocManager::install(c("car", "ridge", "preprocessCore", "genefilter", "sva"))
+
+#install pRRophetic from tar.gz file (place in repo seperately)
+if (!requireNamespace("pRRophetic", quietly = TRUE)) 
+    install.packages("pRRophetic_0.5.tar.gz", repos = NULL, type = "source")
+
+#install other packages that will be used in this script
+if (!requireNamespace(c("qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "biomaRt" , 
+                        "TxDb.Hsapiens.UCSC.hg19.knownGene", "glmnet", "gdata", "tidyverse", 
+                        "illuminaHumanv4.db"), quietly = TRUE)) 
+    BiocManager::install(c("qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg19.knownGene", "biomaRt", 
+                           "glmnet", "gdata", "tidyverse", "illuminaHumanv4.db"))
+
+dir.create("./DataIn")
+
+```
+
+### Downloading Cell Line Data
+
+
+#### Download the data from GDSC. 
+
+NB: Can find the GDSC expression data [at this link](https://www.cancerrxgene.org/gdsc1000/GDSC1000_WebResources//Data/preprocessed/Cell_line_RMA_proc_basalExp.txt.zip )
+However, this information wasn't updated any since 2016 and the 2016 data is already packaged into this version of pRRophetic as cgp2016ExprRma, so we will just call the data from pRRophetic. 
+
+```{r downloading GDSC IC50 data}
+dir.create("./DataIn/GDSC")
+download.file(url = "ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/current_release/GDSC2_fitted_dose_response_17Jul19.xlsx",
+                destfile = "./DataIn/GDSC/GDSC_IC50_July2019.xlsx", mode = "wb")
+
+```
+
+
+Downloads the data from CTRP and CCLE. Data can also be accessed from these links:
+
+CTRPv2 Data from: ftp://caftpd.nci.nih.gov/pub/OCG-DCC/CTD2/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/
+CCLE Data from: https://portals.broadinstitute.org/ccle/data
+
+
+```{r downloading CTRP and CCLE data}
+dir.create("./DataIn/CTRPv2")
+dir.create("./DataIn/CCLE")
+
+#CTRP Data
+temp.zip <- tempfile()
+download.file(url = "ftp://caftpd.nci.nih.gov/pub/OCG-DCC/CTD2/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/CTRPv2.0_2015_ctd2_ExpandedDataset.zip",
+              "./DataIn/CTRP.zip") 
+unzip("./DataIn/CTRP.zip", exdir = "./DataIn/CTRPv2")
+unlink("./DataIn/CTRP.zip")
+
+#Download CCLE Data 
+download.file(url = "https://data.broadinstitute.org/ccle/CCLE_DepMap_18Q2_RNAseq_RPKM_20180502.gct", 
+              destfile = "./DataIn/CCLE/CCLE_RPKM.gct")
+
+######## Commenting Out other Download Files That Alex Used, since these files will not be used
+
+# download.file(url = "https://data.broadinstitute.org/ccle/CCLE_DepMap_18Q2_RNAseq_reads_20180502.gct", 
+#        destfile = "./DataIn/CCLE/CCLE_RNAseq_reads.gct")
+# download.file(url = "https://data.broadinstitute.org/ccle_legacy_data/mRNA_expression/CCLE_Expression_Entrez_2012-09-29.gct", 
+#              destfile = "./DataIn/CCLE/CCLE_ExpressionEntrez.gct")
+
+
+```
+
+### Downloading the TCGA data from FireBrowse
+
+
+```{r downloading TCGA data}
+#this should be updated to the GDC instead of Firebrowse at some point
+dir.create("./DataIn/TCGA")
+download.file("http://gdac.broadinstitute.org/runs/stddata__2015_08_21/data/BRCA/20150821/gdac.broadinstitute.org_BRCA.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2015082100.0.0.tar.gz", "./DataIn/TCGA/TCGA_BRCA_RNA-seq.tar.gz")
+untar("./DataIn/TCGA/TCGA_BRCA_RNA-seq.tar.gz", exdir = "./DataIn/TCGA/")
+#having issues with the untar file name being too long, renaming
+file.rename(from = "./DataIn/TCGA/gdac.broadinstitute.org_BRCA.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2015082100.0.0/", to = "./DataIn/TCGA/RNA-seq" )
+unlink("./DataIn/TCGA/TCGA_BRCA_RNA-seq.tar.gz")
+
+
+```

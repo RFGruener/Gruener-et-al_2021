@@ -1,0 +1,189 @@
+---
+title: "Cleaning Screening Data"
+output: html_notebook
+---
+
+## Objectives:
+
+The goal of this file is to clean the GDSC and CTRP data files
+
+* Clean and harmonize CTRP phenotype files and CCLE RNA-Seq Files
+
+As mentioned previously, I checked the most recent GDSC data (on 8/20/2019) and the 2016 expression data already in the pRRophetic package and they were identical, so I choose just to run with that. 
+    
+    
+Also, note, here the script acts on duplicated geneIDs (removes them for CTRP), but pRRophetic predict has an option to do that (defaults to averaging, but can remove them)
+
+```{r Load Packages and Read in the Data}
+library(tidyverse)
+#Read in CTRPv2 Data (AUC data, compound info, cell line info, and experiment info) 
+CTRPv2_AUC <- read_delim("./DataIn/CTRPv2/v20.data.curves_post_qc.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+CTRPv2_cpd <- read_delim("./DataIn/CTRPv2/v20.meta.per_compound.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+CTRPv2_CCL <- read_delim("./DataIn/CTRPv2/v20.meta.per_cell_line.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+CTRPv2_exp <- read_delim("./DataIn/CTRPv2/v20.meta.per_experiment.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
+
+#Read in CCLE Expression Data    
+CCLE_RNAseq_081117_rpkm <- read_delim("./DataIn/CCLE/CCLE_RPKM.gct", "\t", escape_double = FALSE, trim_ws = TRUE, skip = 2)
+
+#Also to ensure proper formatting of CCLE and CTRP cell line names, we are using harmonized names from a review our lab published (doi: 10.1016/j.pharmthera.2018.06.014). The relevant file is already in the repo:
+All_Cell_Line_Info <- read_excel(path = "All Cell Line Infor.xlsx")
+All_Cell_Line_Info <- All_Cell_Line_Info %>% 
+  dplyr::select("Cell_ID" = "Harmonized Identifier", "Cell_Line_Name" = `Study Cell Line Name`, Dataset)
+
+
+```
+
+
+The CTRP data has IDs for cell lines and compounds, this will match the AUC values with the cell line and compound names
+
+
+```{r Formating AUC Data}
+#Orignally written by Alex Ling, slightly modified
+#Matching AUC values with the cell line and drug names they belong to
+  #Cell line names
+  #Adding cell line names to the list of cell line identifiers in the list of CTRPv2 experiments (CTRPv2_exp)
+    CTRPv2_exp$CCL_Name <- NA
+    for(i in 1:nrow(CTRPv2_exp)){CTRPv2_exp$CCL_Name[i] <- CTRPv2_CCL$ccl_name[CTRPv2_CCL$master_ccl_id %in% CTRPv2_exp$master_ccl_id[i]]}
+  #Adding cell line names to dataframe with AUC values (CTRPv2_AUC) based on experiment IDs
+    CTRPv2_AUC$CCL_Name <- NA
+    experiment_ids <- unique(CTRPv2_AUC$experiment_id)
+    for(i in 1:length(experiment_ids)){CTRPv2_AUC$CCL_Name[CTRPv2_AUC$experiment_id %in% experiment_ids[i]] <- unique(CTRPv2_exp$CCL_Name[CTRPv2_exp$experiment_id %in% experiment_ids[i]])}
+    
+#Drug names
+  #Adding drug names to the dataframe with AUC values (CTRPv2_AUC) based on master_cpd_id
+    CTRPv2_AUC$cpd_name <- NA
+    compound_ids <- unique(CTRPv2_AUC$master_cpd_id)
+    for(i in 1:length(compound_ids)){CTRPv2_AUC$cpd_name[CTRPv2_AUC$master_cpd_id %in% compound_ids[i]] <- unique(CTRPv2_cpd$cpd_name[CTRPv2_cpd$master_cpd_id %in% compound_ids[i]])}
+  #Determining how many drugs and cell lines there are in the CTRPv2 drug data
+    length(unique(CTRPv2_AUC$CCL_Name)) #887
+    length(unique(CTRPv2_AUC$cpd_name)) #545
+    length(unique(CTRPv2_AUC$master_cpd_id)) #545, compound ids match to unique compound names
+  
+    
+#Determining if any duplicate tests were performed in CTRPv2 such that there are multiple AUC values for a cell line/drug combination
+  #Making column with the cell line and compound names pasted together and seeing if each value is unique in that column
+    CTRPv2_AUC$CCL_Drug <- paste(CTRPv2_AUC$CCL_Name, CTRPv2_AUC$cpd_name, sep = ":|:")
+    #table(duplicated(CTRPv2_AUC$CCL_Drug)) #8133 of these values are duplicated, so some cell lines and drugs were tested together more than once
+  #Getting list of duplicated cell line/drug combinations
+    dups <- unique(CTRPv2_AUC$CCL_Drug[duplicated(CTRPv2_AUC$CCL_Drug)])
+    dup.CTRPv2_AUC <- CTRPv2_AUC[CTRPv2_AUC$CCL_Drug %in% dups,]
+  #Extracting data with unique cell line/drug combinations
+    non.dup.CTRPv2_AUC <- CTRPv2_AUC[! CTRPv2_AUC$CCL_Drug %in% dups,]
+  ##Checking how well duplicates correlate with each other
+  ##What is average number of duplicates?
+    #table(table(dup.CTRPv2_AUC$CCL_Drug)) #mostly duplicated once, 425 duplicated twice
+  #### Commented out, below we plot the dublicates and see that they correlate well, so we decided to average the duplicate cell line/drug pairs
+  #Making data frame to plot AUC with first duplicate for each pair on x axis and second duplicate on y axis
+    # plot.data <- as.data.frame(matrix(NA, nrow = length(dups), ncol = 4))
+    # colnames(plot.data) <- c("x", "y", "n_x","n_y")
+    # for(i in 1:length(dups)){
+    #   temp.data <- dup.CTRPv2_AUC[dup.CTRPv2_AUC$CCL_Drug %in% dups[i],]
+    #   plot.data$x[i] <- temp.data$area_under_curve[1]
+    #   plot.data$y[i] <- temp.data$area_under_curve[2]
+    #   # temp.data_1 <- as.data.frame(rbind(temp.data[1,], non.dup.CTRPv2_AUC[non.dup.CTRPv2_AUC$experiment_id %in% temp.data$experiment_id[1],]))
+    #   # temp.data_2 <- as.data.frame(rbind(temp.data[2,], non.dup.CTRPv2_AUC[non.dup.CTRPv2_AUC$experiment_id %in% temp.data$experiment_id[2],]))
+    #   # plot.data$n_x <- nrow(temp.data_1)
+    #   # plot.data$n_y <- nrow(temp.data_2)
+    # }
+    # plot(plot.data$x, plot.data$y)
+    # cor.test(plot.data$x, plot.data$y)
+    # lm(plot.data$y ~ plot.data$x)
+    # table(dup.CTRPv2_AUC$CCL_Name)
+    # table(dup.CTRPv2_AUC$cpd_name)
+    # length(unique(dup.CTRPv2_AUC$CCL_Name))
+    # length(unique(dup.CTRPv2_AUC$cpd_name))
+  
+#Averaging duplicated cell line/drug combinations and adding to unique dataset
+    CTRPv2_AUC$Avg_AUC <- NA
+    CTRPv2_AUC$Avg_AUC[! CTRPv2_AUC$CCL_Drug %in% dups] <- CTRPv2_AUC$area_under_curve[! CTRPv2_AUC$CCL_Drug %in% dups]
+    for(i in 1:length(dups)){
+      CTRPv2_AUC$Avg_AUC[CTRPv2_AUC$CCL_Drug %in% dups[i]] <- mean(CTRPv2_AUC$area_under_curve[CTRPv2_AUC$CCL_Drug %in% dups[i]])
+    }
+    
+#Save File
+    write.table(CTRPv2_AUC, "./DataIn/CTRPv2/CTRPv2_AUC_clean.txt", sep = "\t", quote = F, row.names = T, col.names = NA)
+    
+    
+    
+```
+
+
+```{r CCLE RNA-Seq Cleaning}
+
+  #Formating expression data
+      CCLE_RNAseq <- CCLE_RNAseq_081117_rpkm[complete.cases(CCLE_RNAseq_081117_rpkm),]
+    #Converting cell line names to those of ctrp
+      CCLE_CLnames_raw <- colnames(CCLE_RNAseq[,3:ncol(CCLE_RNAseq)])
+      CCLE_match <- as.data.frame(matrix(NA, nrow = length(CCLE_CLnames_raw), ncol = 2))
+      colnames(CCLE_match) <- c("Original_CCLE_name", "CCLE_name")
+      CCLE_match$Original_CCLE_name <- CCLE_CLnames_raw
+      CCLE_match$CCLE_name <- sapply(strsplit(CCLE_CLnames_raw, "_"), "[[", 1)
+      CCLE_data <- All_Cell_Line_Info[All_Cell_Line_Info$Dataset %in% "CCLE", which(colnames(All_Cell_Line_Info) %in% c("Cell_ID", "Cell_Line_Name"))]
+      CCLE_data$Cell_Line_Name <- toupper(gsub("[^[:alnum:] ]", "", CCLE_data$Cell_Line_Name))
+      CCLE_data$Cell_Line_Name <- gsub(" ", "", CCLE_data$Cell_Line_Name)
+      CCLE_match$CCLE_name <- toupper(gsub("[^[:alnum:] ]", "", CCLE_match$CCLE_name))
+      CCLE_match$CCLE_name <- gsub(" ", "", CCLE_match$CCLE_name)
+      CCLE_match <- merge(CCLE_match, CCLE_data, by.x = "CCLE_name", by.y = "Cell_Line_Name", all.x = T, all.y = F)
+      table(is.na(CCLE_match$Cell_ID))
+      missing <- CCLE_match[is.na(CCLE_match$Cell_ID),]
+      table(missing$CCLE_name %in% All_Cell_Line_Info$Cell_Line_Name)
+      temp.missing <- merge(missing, All_Cell_Line_Info, by.x = "CCLE_name", by.y = "Cell_Line_Name", all.x = T, all.y = F)
+      temp.missing <- unique(temp.missing[,which(colnames(temp.missing) %in% c("Cell_ID.y", "Original_CCLE_name", "CCLE_name"))])
+      colnames(temp.missing)[3] <- "Cell_ID"
+      temp.missing$Cell_ID[is.na(temp.missing$Cell_ID)] <- temp.missing$Original_CCLE_name[is.na(temp.missing$Cell_ID)]
+      CCLE_match <- CCLE_match[! is.na(CCLE_match$Cell_ID),]
+      CCLE_match <- rbind(CCLE_match, temp.missing)
+      table(is.na(CCLE_match$Cell_ID))
+      rm(CCLE_data)
+      CTRPv2_reviewData <- All_Cell_Line_Info[All_Cell_Line_Info$Dataset %in% "CTRPv2",]
+      CCLE_match <- merge(CCLE_match, CTRPv2_reviewData[,which(colnames(CTRPv2_reviewData) %in% c("Cell_ID", "Cell_Line_Name"))], by = "Cell_ID", all.x = T, all.y = F)
+      colnames(CCLE_match)[4] <- "CTRPv2_CCL_Name"
+      table(unique(CTRPv2_AUC$CCL_Name) %in% CCLE_match$CTRPv2_CCL_Name)
+      table(unique(CTRPv2_AUC$CCL_Name) %in% CTRPv2_reviewData$Cell_Line_Name)
+      CCLE_match$CTRPv2_CCL_Name[is.na(CCLE_match$CTRPv2_CCL_Name)] <- CCLE_match$Original_CCLE_name[is.na(CCLE_match$CTRPv2_CCL_Name)]
+      table(is.na(CCLE_match$CTRPv2_CCL_Name))
+      
+      RNAseq_CCLs <- colnames(CCLE_RNAseq[,-c(1,2)])
+      table(RNAseq_CCLs %in% CCLE_match$Original_CCLE_name)
+      Ordered_CTRPv2_names <- CCLE_match$CTRPv2_CCL_Name[match(CCLE_CLnames_raw, CCLE_match$Original_CCLE_name)]
+      colnames(CCLE_RNAseq)[3:ncol(CCLE_RNAseq)] <- Ordered_CTRPv2_names
+      table(unique(CTRPv2_AUC$CCL_Name) %in% colnames(CCLE_RNAseq))
+    
+    #Checking for duplicate genes
+      table(duplicated(CCLE_RNAseq$Description))
+      dups <- CCLE_RNAseq$Description[duplicated(CCLE_RNAseq$Description)]
+      temp <- CCLE_RNAseq[CCLE_RNAseq$Description %in% dups,]
+      table(table(temp$Description))
+      temp2 <- as.data.frame(table(temp$Description))
+      doubles <- temp2$Var1[temp2$Freq %in% 2]
+      temp <- temp[temp$Description %in% doubles,]
+      table(table(temp$Description))
+      temp <- temp[order(temp$Description),]
+      x <- c(t(temp[! duplicated(temp$Description),-c(1,2)]))
+      y <- c(t(temp[duplicated(temp$Description),-c(1,2)]))
+      plot(x,y) #inconsistent correlation between duplicated entrez gene names. Probably don't all refer to same transcript, and will be excluded
+      #Excluding duplicate entrez gene names
+      CCLE_RNAseq <- CCLE_RNAseq[! duplicated(CCLE_RNAseq$Description),]
+      nrow(CCLE_RNAseq) #54159
+    #Formatting RNAseq data as necessary for predictions 
+      CTRPv2_RNAseq <- CCLE_RNAseq
+      CTRPv2_RNAseq <- CTRPv2_RNAseq[,-c(1,2)]
+      CTRPv2_RNAseq <- as.matrix(CTRPv2_RNAseq)
+      rownames(CTRPv2_RNAseq) <- CCLE_RNAseq$Description
+    #Converting RPKM to TPM
+      RPKM.to.TPM <- function(Sample_RPKMs){
+        return((Sample_RPKMs/sum(Sample_RPKMs))*10^6)
+      }
+      CTRPv2_RNAseq.tpm <- matrix(NA, nrow = nrow(CTRPv2_RNAseq), ncol = ncol(CTRPv2_RNAseq))
+      rownames(CTRPv2_RNAseq.tpm) <- rownames(CTRPv2_RNAseq)
+      colnames(CTRPv2_RNAseq.tpm) <- colnames(CTRPv2_RNAseq)
+      for(i in 1:ncol(CTRPv2_RNAseq.tpm)){
+        CTRPv2_RNAseq.tpm[,i] <- RPKM.to.TPM(CTRPv2_RNAseq[,i])
+      }
+      colSums(CTRPv2_RNAseq)[1:10]
+      colSums(CTRPv2_RNAseq.tpm)[1:10]
+  #Save File
+      write.table(CTRPv2_RNAseq.tpm, "./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt", sep = "\t", quote = F, row.names = T, col.names = NA)
+```
+
+

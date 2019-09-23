@@ -1,0 +1,136 @@
+---
+title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug response in GDSC cell lines'
+output: html_notebook 
+---
+
+### Objectives
+
+Do the imputations
+
+ * Set the parameters
+ * Load the GDSC test expression data
+ * Load the CTRP/CCLE Training expression and drug data
+ * Generate the models and impute using the pRRophetic framework
+
+Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. Also, could just run the blocks that are of interest. 
+
+### First, load packages and set parameters
+```{r loading packages and setting parameters, results= "hide"}
+set.seed(12345)
+#Loading Packages
+needed_packages <- c("tidyverse", "qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg19.knownGene", 
+                     "parallel", "biomaRt", "readxl", 
+                     "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
+lapply(needed_packages, require, character.only = TRUE)
+
+###################### Set Parameters ##########################
+
+# Set location and filename  for list/matrix R.data output 
+dir.create("DataOut")
+#list_output_name <- "./DataOut/CTRPbreastcancerPREDS.RData" #we won't be using the list, but you can save it if you so choose 
+matrix_output_name <- "./DataOut/CTRP-Models_on_GDSC-RNA.RData"
+
+# Finally, set parameters of pRRophetic's calcphenotype function 
+#batchCorrect options: "eb" for ComBat, "qn" for quantiles normalization, "standardize", or "none"
+batchCorrect <- "eb"
+#powerTransformPhenotype: does a power transformation to the phenotype data, recommended over log transformations by the literture for use in Ridge regression 
+powerTransformPhenotype <- TRUE
+#removeLowVaryingGenes: percentage of low varying genes to remove, default is at 0.2 
+removeLowVaryingGenes <- 0.2
+#removeLowVaryingGenesFrom: where should it remove low varying genes from "homogenizeData" or "rawData"
+removeLowVaringGenesFrom <- "homogenizeData"
+#minNumSamples: minimum number of training samples, set to 30, but this shouldn't be an issue since the there are many samples 
+minNumSamples = 30
+#selection: how to deal with duplicated gene IDs, -1 for ask user, 1 for summarize by mean, 2 for disregard duplicates
+selection <- 1
+#printoutput: should it print outputs, default is TRUE
+printOutput = TRUE
+
+
+```
+
+### Second, load the RNA-Seq data
+
+```{r Load RNA-Seq}
+############ Load Test Expression data (as Matrix) ###################
+
+##### load the GDSC data and format:
+data(cgp2016ExprRma)
+ cgp2016ExprRma <- cgp2016ExprRma[, ! is.na(colnames(cgp2016ExprRma))]
+    table(is.na(colnames(cgp2016ExprRma)))
+  #Getting new dups without NA columns
+    table(duplicated(colnames(cgp2016ExprRma))) #49 duplicates
+    exp.dups <- unique(colnames(cgp2016ExprRma)[duplicated(colnames(cgp2016ExprRma))])
+  #Seeing how well gene expression correlates in these duplicates, commented out code would show they correlate well
+    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[1]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[1]][,2])
+    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[2]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[2]][,2])
+    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[3]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[3]][,2])
+    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[4]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[4]][,2])
+  ##Strong correlations between them all. Averaging them together.
+  #Removing dups
+    GDSC_2016_Expression_Data <- cgp2016ExprRma[,! colnames(cgp2016ExprRma) %in% exp.dups]
+  #Adding back averaged dups
+    for(i in 1:length(exp.dups)){
+      GDSC_2016_Expression_Data <- cbind(GDSC_2016_Expression_Data, rowMeans(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[i]]))
+      colnames(GDSC_2016_Expression_Data)[ncol(GDSC_2016_Expression_Data)] <- exp.dups[i]
+    }
+    testExprData <- GDSC_2016_Expression_Data
+    colnames(testExprData) <- paste(colnames(GDSC_2016_Expression_Data), "test", sep = "_") #The Test expression dataset cannot have the same names as the traning expression dataset, so adding "test" prevents that. The imputation framework below only does batch correction across all the cell lines; luckily, the models are built for every test subject separately and independently. That is, we can still perform an analysis of non-overlapping cell lines even if we impute in all. We will impute in all the cell lines then because of this and since the overlap is coming from two completely independent datasets. 
+
+```
+
+### Third, perform Imputations:
+
+Create models using CTRP for imputations in the GDSC RNA-Seq as test expression
+
+```{r CTRP Imputations on GDSC RNA-seq data, results = "hide"}
+
+#Loads training phenotype data 
+CTRPv2_AUC <- read.delim("./DataIn/CTRPv2/CTRPv2_AUC_clean.txt", sep = "\t", stringsAsFactors = F)
+#Altering cell line names that start with a number to start with an X to match rownames of expression data
+start.with.number <- grep("^[[:digit:]]", CTRPv2_AUC$CCL_Name)
+CTRPv2_AUC$CCL_Name[start.with.number] <- paste("X", CTRPv2_AUC$CCL_Name[start.with.number], sep = "")
+
+trainingPhenData <- CTRPv2_AUC
+possibleDrugs <- unique(trainingPhenData$cpd_name)
+
+#Load Training Expression data, convert it to a matrix
+CTRPv2_RNAseq_TPM <- read.delim("./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt",  sep = "\t", stringsAsFactors = F)
+convert.to.matrix <- function(df){
+  mat <- as.matrix(df[,-1])
+  rownames(mat) <- c(t(df[,1]))
+  return(mat)
+  }
+ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
+#make a list of all possible drugs predictions
+CTRPDrugPredictions <- list()
+
+########make a for loop for each drug seperate#################
+for(i in 1:length(possibleDrugs)) { 
+  drug <- possibleDrugs[i]
+  temp <- trainingPhenData[trainingPhenData$cpd_name == drug,] ## Makes temp matrix to extract the AUCs easier
+  AUCs <- as.numeric(temp$Avg_AUC)
+  names(AUCs) <- temp$CCL_Name
+  commonCellLines <- colnames(ExprData)[colnames(ExprData) %in% names(AUCs)]
+  AUCsOrd <- AUCs[commonCellLines]
+  trainDataOrd <- ExprData[, commonCellLines]
+  trainDataOrd <- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
+
+  CTRPDrugPredictions[[i]] <- calcPhenotype(trainingExprData =  trainDataOrd, 
+                                trainingPtype = AUCsOrd, testExprData = testExprData, batchCorrect = batchCorrect, 
+                                powerTransformPhenotype = powerTransformPhenotype, 
+                                removeLowVaryingGenes = removeLowVaryingGenes, 
+                                minNumSamples = minNumSamples, selection = selection, 
+                                printOutput = printOutput, removeLowVaringGenesFrom = removeLowVaringGenesFrom)
+} #close for loop
+
+names(CTRPDrugPredictions) <- possibleDrugs
+CTRPDrugPredictions_mat <- do.call(rbind, CTRPDrugPredictions)
+# save(CTRPDrugPredictions, file= list_output_name)
+save(CTRPDrugPredictions_mat, file= matrix_output_name)
+
+
+
+```
+
+

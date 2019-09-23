@@ -1,0 +1,122 @@
+---
+title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug response in TCGA BRCA Tumors'
+output: html_notebook 
+---
+
+### Objectives
+
+Do the imputations
+
+ * Set the parameters
+ * Load the test expression data (TCGA Breast Cancer)
+ * Load the CTRP/CCLE Training expression and drug data
+ * Generate the models and impute using the pRRophetic framework 
+
+Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file.  
+
+### First, load packages and set parameters
+```{r loading packages and setting parameters, results= "hide"}
+set.seed(12345)
+#Loading Packages
+needed_packages <- c("tidyverse", "qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg19.knownGene", 
+                     "parallel", "biomaRt", "readxl", 
+                     "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
+lapply(needed_packages, require, character.only = TRUE)
+
+###################### Set Parameters ##########################
+# Set location and filename  for list/matrix R.data output (ctrp_list_output_name, ctrp_mat_output_name)
+
+dir.create("DataOut")
+matrix_output_name <- "./DataOut/CTRP-Models_on_TCGA-BRCA-RNA.RData"
+
+# Finally, set parameters of pRRophetic's calcphenotype function 
+#batchCorrect options: "eb" for ComBat, "qn" for quantiles normalization, "standardize", or "none"
+batchCorrect <- "eb"
+#powerTransformPhenotype: does a power transformation to the phenotype data, recommended over log transformations by the literture 
+powerTransformPhenotype <- TRUE
+#removeLowVaryingGenes: percentage of low varying genes to remove, default is at 0.2 
+removeLowVaryingGenes <- 0.2
+#removeLowVaryingGenesFrom: where should it remove low varying genes from "homogenizeData" or "rawData"
+removeLowVaringGenesFrom <- "homogenizeData"
+#minNumSamples: minimum number of training samples, set to 30, but this shouldn't be an issue since the there are many samples 
+minNumSamples = 30
+#selection: how to deal with duplicated gene IDs, -1 for ask user, 1 for summarize by mean, 2 for disregard duplicates
+selection <- 1
+#printoutput: should it print outputs, default is TRUE
+printOutput = TRUE
+
+
+```
+
+### Second, load the RNA-Seq data
+
+```{r Load RNA-Seq}
+############ Load Test Expression data (as Matrix) ###################
+
+# load  the breast cancer RNA-seq file downloaded previously
+tpmDatMat <- read.delim(file = "./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt", as.is=T)
+tpmDatMat_tpm <- tpmDatMat[-1,which(tpmDatMat[1,] == "scaled_estimate")]
+tpmDatMat_tpm <- apply(tpmDatMat_tpm, 2, as.numeric)
+geneNames <- do.call(cbind, strsplit(tpmDatMat[, "Hybridization.REF"], "|", fixed=TRUE))[1,][-1]
+rownames(tpmDatMat_tpm) <- geneNames
+colnames(tpmDatMat_tpm) <- substr(colnames(tpmDatMat_tpm), 1, 28)
+tpmDatMat_tpm_logged <- log((tpmDatMat_tpm*1000000)+1) # transform the data
+#remove adjacent normal RNA-seq samples
+testExprData <- tpmDatMat_tpm_logged[,-grep(pattern = ".11A.|.11B.|.10A.|.10B.", colnames(tpmDatMat_tpm_logged))]
+
+```
+
+### Third, perform Imputations:
+
+Perform imputations for GDSC or CTRP
+
+```{r CTRP Imputations, message = FALSE}
+
+#Loads training phenotype data 
+CTRPv2_AUC <- read.delim("./DataIn/CTRPv2/CTRPv2_AUC_clean.txt", sep = "\t", stringsAsFactors = F)
+#Altering cell line names that start with a number to start with an X to match rownames of expression data
+start.with.number <- grep("^[[:digit:]]", CTRPv2_AUC$CCL_Name)
+CTRPv2_AUC$CCL_Name[start.with.number] <- paste("X", CTRPv2_AUC$CCL_Name[start.with.number], sep = "")
+#making training PhenData with same layout between CTRP/GDSC ##NB not the same layout
+trainingPhenData <- CTRPv2_AUC
+#names(trainingPhenData)[names(trainingPhenData)== "cpd_name"] <- "Drug.name"
+possibleDrugs <- unique(trainingPhenData$cpd_name)
+
+#Load Training Expression data, convert it to a matrix
+CTRPv2_RNAseq_TPM <- read.delim("./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt",  sep = "\t", stringsAsFactors = F)
+convert.to.matrix <- function(df){
+  mat <- as.matrix(df[,-1])
+  rownames(mat) <- c(t(df[,1]))
+  return(mat)
+  }
+ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
+#make a list of all possible drugs predictions
+CTRPDrugPredictions <- list()
+
+########make a for loop for each drug seperate#################
+for(i in 1:length(possibleDrugs)) { 
+  drug <- possibleDrugs[i]
+  temp <- trainingPhenData[trainingPhenData$cpd_name == drug,] ## Makes temp matrix to extract the AUCs easier
+  AUCs <- as.numeric(temp$Avg_AUC)
+  names(AUCs) <- temp$CCL_Name
+  commonCellLines <- colnames(ExprData)[colnames(ExprData) %in% names(AUCs)]
+  AUCsOrd <- AUCs[commonCellLines]
+  trainDataOrd <- ExprData[, commonCellLines]
+  trainDataOrd <- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
+
+  CTRPDrugPredictions[[1]] <- calcPhenotype(trainingExprData =  trainDataOrd, 
+                                trainingPtype = AUCsOrd, testExprData = testExprData, batchCorrect = batchCorrect, 
+                                powerTransformPhenotype = powerTransformPhenotype, removeLowVaryingGenes = removeLowVaryingGenes, 
+                                minNumSamples = minNumSamples, selection = selection, 
+                                printOutput = printOutput, removeLowVaringGenesFrom = removeLowVaringGenesFrom)
+} #close for loop
+
+names(CTRPDrugPredictions) <- possibleDrugs
+CTRPDrugPredictions_mat <- do.call(rbind, CTRPDrugPredictions)
+save(CTRPDrugPredictions_mat, file= matrix_output_name)
+
+
+```
+
+
+
