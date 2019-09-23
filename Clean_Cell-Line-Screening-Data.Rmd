@@ -30,7 +30,7 @@ CTRPv2_exp <- read_delim("./DataIn/CTRPv2/v20.meta.per_experiment.txt", "\t", es
 CCLE_RNAseq_081117_rpkm <- read_delim("./DataIn/CCLE/CCLE_RPKM.gct", "\t", escape_double = FALSE, trim_ws = TRUE, skip = 2)
 
 #Also to ensure proper formatting of CCLE and CTRP cell line names, we are using harmonized names from a review our lab published (doi: 10.1016/j.pharmthera.2018.06.014). The relevant file is already in the repo:
-All_Cell_Line_Info <- read_excel(path = "All Cell Line Infor.xlsx")
+All_Cell_Line_Info <- read_excel(path = "Included_Data/All Cell Line Info.xlsx")
 All_Cell_Line_Info <- All_Cell_Line_Info %>% 
   dplyr::select("Cell_ID" = "Harmonized Identifier", "Cell_Line_Name" = `Study Cell Line Name`, Dataset)
 

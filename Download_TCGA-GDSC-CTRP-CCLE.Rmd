@@ -12,7 +12,7 @@ The goal of this file is to: download and install the necessary packages and fil
  * Download the RNA-Seq information
  * Download the TCGA dataset
  
-Important note, certain files are already included in this parent directory including "pRRophetic_0.5.tar.gz" , "All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Particularly for the first two files listed, they are needed to run the imputations, the last for Analyzing the imputation data in GDSC. 
+Important note, certain files are already included in this "Included_Data" directory including "pRRophetic_0.5.tar.gz" , "All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Particularly for the first two files listed, they are needed to run the imputations, the last for Analyzing the imputation data in GDSC. 
 
 pRRophetic_0.5.tar.gz can be downloaded here
 All Cell Line Infor.xlsx is already included in this github repo, it was originally published in our review doi:
@@ -88,13 +88,6 @@ unlink("./DataIn/CTRP.zip")
 #Download CCLE Data 
 download.file(url = "https://data.broadinstitute.org/ccle/CCLE_DepMap_18Q2_RNAseq_RPKM_20180502.gct", 
               destfile = "./DataIn/CCLE/CCLE_RPKM.gct")
-
-######## Commenting Out other Download Files That Alex Used, since these files will not be used
-
-# download.file(url = "https://data.broadinstitute.org/ccle/CCLE_DepMap_18Q2_RNAseq_reads_20180502.gct", 
-#        destfile = "./DataIn/CCLE/CCLE_RNAseq_reads.gct")
-# download.file(url = "https://data.broadinstitute.org/ccle_legacy_data/mRNA_expression/CCLE_Expression_Entrez_2012-09-29.gct", 
-#              destfile = "./DataIn/CCLE/CCLE_ExpressionEntrez.gct")
 
 
 ```

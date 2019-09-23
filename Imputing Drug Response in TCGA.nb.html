@@ -1774,21 +1774,6 @@ summary {
 <h3>Second, load the RNA-Seq data</h3>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuIyMjIyMjIyMjIyMjIExvYWQgVGVzdCBFeHByZXNzaW9uIGRhdGEgKGFzIE1hdHJpeCkgIyMjIyMjIyMjIyMjIyMjIyMjI1xuXG4jIGxvYWQgIHRoZSBicmVhc3QgY2FuY2VyIFJOQS1zZXEgZmlsZSBkb3dubG9hZGVkIHByZXZpb3VzbHlcbnRwbURhdE1hdCA8LSByZWFkLmRlbGltKGZpbGUgPSBcIi4vRGF0YUluL1RDR0EvUk5BLXNlcS9CUkNBLnJuYXNlcXYyX19pbGx1bWluYWhpc2VxX3JuYXNlcXYyX191bmNfZWR1X19MZXZlbF8zX19SU0VNX2dlbmVzX19kYXRhLmRhdGEudHh0XCIsIGFzLmlzPVQpXG50cG1EYXRNYXRfdHBtIDwtIHRwbURhdE1hdFstMSx3aGljaCh0cG1EYXRNYXRbMSxdID09IFwic2NhbGVkX2VzdGltYXRlXCIpXVxudHBtRGF0TWF0X3RwbSA8LSBhcHBseSh0cG1EYXRNYXRfdHBtLCAyLCBhcy5udW1lcmljKVxuZ2VuZU5hbWVzIDwtIGRvLmNhbGwoY2JpbmQsIHN0cnNwbGl0KHRwbURhdE1hdFssIFwiSHlicmlkaXphdGlvbi5SRUZcIl0sIFwifFwiLCBmaXhlZD1UUlVFKSlbMSxdWy0xXVxucm93bmFtZXModHBtRGF0TWF0X3RwbSkgPC0gZ2VuZU5hbWVzXG5jb2xuYW1lcyh0cG1EYXRNYXRfdHBtKSA8LSBzdWJzdHIoY29sbmFtZXModHBtRGF0TWF0X3RwbSksIDEsIDI4KVxudHBtRGF0TWF0X3RwbV9sb2dnZWQgPC0gbG9nKCh0cG1EYXRNYXRfdHBtKjEwMDAwMDApKzEpICMgdHJhbnNmb3JtIHRoZSBkYXRhXG4jcmVtb3ZlIGFkamFjZW50IG5vcm1hbCBSTkEtc2VxIHNhbXBsZXNcbnRlc3RFeHByRGF0YSA8LSB0cG1EYXRNYXRfdHBtX2xvZ2dlZFssLWdyZXAocGF0dGVybiA9IFwiLjExQS58LjExQi58LjEwQS58LjEwQi5cIiwgY29sbmFtZXModHBtRGF0TWF0X3RwbV9sb2dnZWQpKV1cblxuYGBgIn0= -->
-<pre class="r"><code>############ Load Test Expression data (as Matrix) ###################
-
-# load  the breast cancer RNA-seq file downloaded previously
-tpmDatMat &lt;- read.delim(file = &quot;./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt&quot;, as.is=T)
-tpmDatMat_tpm &lt;- tpmDatMat[-1,which(tpmDatMat[1,] == &quot;scaled_estimate&quot;)]
-tpmDatMat_tpm &lt;- apply(tpmDatMat_tpm, 2, as.numeric)
-geneNames &lt;- do.call(cbind, strsplit(tpmDatMat[, &quot;Hybridization.REF&quot;], &quot;|&quot;, fixed=TRUE))[1,][-1]
-rownames(tpmDatMat_tpm) &lt;- geneNames
-colnames(tpmDatMat_tpm) &lt;- substr(colnames(tpmDatMat_tpm), 1, 28)
-tpmDatMat_tpm_logged &lt;- log((tpmDatMat_tpm*1000000)+1) # transform the data
-#remove adjacent normal RNA-seq samples
-testExprData &lt;- tpmDatMat_tpm_logged[,-grep(pattern = &quot;.11A.|.11B.|.10A.|.10B.&quot;, colnames(tpmDatMat_tpm_logged))]
-</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 </div>
@@ -1797,52 +1782,6 @@ testExprData &lt;- tpmDatMat_tpm_logged[,-grep(pattern = &quot;.11A.|.11B.|.10A.
 <p>Perform imputations for GDSC or CTRP</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuXG4jTG9hZHMgdHJhaW5pbmcgcGhlbm90eXBlIGRhdGEgXG5DVFJQdjJfQVVDIDwtIHJlYWQuZGVsaW0oXCIuL0RhdGFJbi9DVFJQdjIvQ1RSUHYyX0FVQ19jbGVhbi50eHRcIiwgc2VwID0gXCJcXHRcIiwgc3RyaW5nc0FzRmFjdG9ycyA9IEYpXG4jQWx0ZXJpbmcgY2VsbCBsaW5lIG5hbWVzIHRoYXQgc3RhcnQgd2l0aCBhIG51bWJlciB0byBzdGFydCB3aXRoIGFuIFggdG8gbWF0Y2ggcm93bmFtZXMgb2YgZXhwcmVzc2lvbiBkYXRhXG5zdGFydC53aXRoLm51bWJlciA8LSBncmVwKFwiXltbOmRpZ2l0Ol1dXCIsIENUUlB2Ml9BVUMkQ0NMX05hbWUpXG5DVFJQdjJfQVVDJENDTF9OYW1lW3N0YXJ0LndpdGgubnVtYmVyXSA8LSBwYXN0ZShcIlhcIiwgQ1RSUHYyX0FVQyRDQ0xfTmFtZVtzdGFydC53aXRoLm51bWJlcl0sIHNlcCA9IFwiXCIpXG4jbWFraW5nIHRyYWluaW5nIFBoZW5EYXRhIHdpdGggc2FtZSBsYXlvdXQgYmV0d2VlbiBDVFJQL0dEU0MgIyNOQiBub3QgdGhlIHNhbWUgbGF5b3V0XG50cmFpbmluZ1BoZW5EYXRhIDwtIENUUlB2Ml9BVUNcbiNuYW1lcyh0cmFpbmluZ1BoZW5EYXRhKVtuYW1lcyh0cmFpbmluZ1BoZW5EYXRhKT09IFwiY3BkX25hbWVcIl0gPC0gXCJEcnVnLm5hbWVcIlxucG9zc2libGVEcnVncyA8LSB1bmlxdWUodHJhaW5pbmdQaGVuRGF0YSRjcGRfbmFtZSlcblxuI0xvYWQgVHJhaW5pbmcgRXhwcmVzc2lvbiBkYXRhLCBjb252ZXJ0IGl0IHRvIGEgbWF0cml4XG5DVFJQdjJfUk5Bc2VxX1RQTSA8LSByZWFkLmRlbGltKFwiLi9EYXRhSW4vQ1RSUHYyL0NUUlB2Ml9STkFzZXFfVFBNX2NsZWFuLnR4dFwiLCAgc2VwID0gXCJcXHRcIiwgc3RyaW5nc0FzRmFjdG9ycyA9IEYpXG5jb252ZXJ0LnRvLm1hdHJpeCA8LSBmdW5jdGlvbihkZil7XG4gIG1hdCA8LSBhcy5tYXRyaXgoZGZbLC0xXSlcbiAgcm93bmFtZXMobWF0KSA8LSBjKHQoZGZbLDFdKSlcbiAgcmV0dXJuKG1hdClcbiAgfVxuRXhwckRhdGEgPC0gY29udmVydC50by5tYXRyaXgoQ1RSUHYyX1JOQXNlcV9UUE0pXG4jbWFrZSBhIGxpc3Qgb2YgYWxsIHBvc3NpYmxlIGRydWdzIHByZWRpY3Rpb25zXG5DVFJQRHJ1Z1ByZWRpY3Rpb25zIDwtIGxpc3QoKVxuXG4jIyMjIyMjI21ha2UgYSBmb3IgbG9vcCBmb3IgZWFjaCBkcnVnIHNlcGVyYXRlIyMjIyMjIyMjIyMjIyMjIyNcbmZvcihpIGluIDE6bGVuZ3RoKHBvc3NpYmxlRHJ1Z3MpKSB7IFxuICBkcnVnIDwtIHBvc3NpYmxlRHJ1Z3NbaV1cbiAgdGVtcCA8LSB0cmFpbmluZ1BoZW5EYXRhW3RyYWluaW5nUGhlbkRhdGEkY3BkX25hbWUgPT0gZHJ1ZyxdICMjIE1ha2VzIHRlbXAgbWF0cml4IHRvIGV4dHJhY3QgdGhlIEFVQ3MgZWFzaWVyXG4gIEFVQ3MgPC0gYXMubnVtZXJpYyh0ZW1wJEF2Z19BVUMpXG4gIG5hbWVzKEFVQ3MpIDwtIHRlbXAkQ0NMX05hbWVcbiAgY29tbW9uQ2VsbExpbmVzIDwtIGNvbG5hbWVzKEV4cHJEYXRhKVtjb2xuYW1lcyhFeHByRGF0YSkgJWluJSBuYW1lcyhBVUNzKV1cbiAgQVVDc09yZCA8LSBBVUNzW2NvbW1vbkNlbGxMaW5lc11cbiAgdHJhaW5EYXRhT3JkIDwtIEV4cHJEYXRhWywgY29tbW9uQ2VsbExpbmVzXVxuICB0cmFpbkRhdGFPcmQgPC0gdHJhaW5EYXRhT3JkWyhyb3dTdW1zKHRyYWluRGF0YU9yZCkgIT0gMCksIF1cblxuICBDVFJQRHJ1Z1ByZWRpY3Rpb25zW1sxXV0gPC0gY2FsY1BoZW5vdHlwZSh0cmFpbmluZ0V4cHJEYXRhID0gIHRyYWluRGF0YU9yZCwgXG4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHRyYWluaW5nUHR5cGUgPSBBVUNzT3JkLCB0ZXN0RXhwckRhdGEgPSB0ZXN0RXhwckRhdGEsIGJhdGNoQ29ycmVjdCA9IGJhdGNoQ29ycmVjdCwgXG4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBvd2VyVHJhbnNmb3JtUGhlbm90eXBlID0gcG93ZXJUcmFuc2Zvcm1QaGVub3R5cGUsIHJlbW92ZUxvd1ZhcnlpbmdHZW5lcyA9IHJlbW92ZUxvd1ZhcnlpbmdHZW5lcywgXG4gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG1pbk51bVNhbXBsZXMgPSBtaW5OdW1TYW1wbGVzLCBzZWxlY3Rpb24gPSBzZWxlY3Rpb24sIFxuICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwcmludE91dHB1dCA9IHByaW50T3V0cHV0LCByZW1vdmVMb3dWYXJpbmdHZW5lc0Zyb20gPSByZW1vdmVMb3dWYXJpbmdHZW5lc0Zyb20pXG59ICNjbG9zZSBmb3IgbG9vcFxuXG5uYW1lcyhDVFJQRHJ1Z1ByZWRpY3Rpb25zKSA8LSBwb3NzaWJsZURydWdzXG5DVFJQRHJ1Z1ByZWRpY3Rpb25zX21hdCA8LSBkby5jYWxsKHJiaW5kLCBDVFJQRHJ1Z1ByZWRpY3Rpb25zKVxuc2F2ZShDVFJQRHJ1Z1ByZWRpY3Rpb25zX21hdCwgZmlsZT0gbWF0cml4X291dHB1dF9uYW1lKVxuXG5cbmBgYCJ9 -->
-<pre class="r"><code>
-#Loads training phenotype data 
-CTRPv2_AUC &lt;- read.delim(&quot;./DataIn/CTRPv2/CTRPv2_AUC_clean.txt&quot;, sep = &quot;\t&quot;, stringsAsFactors = F)
-#Altering cell line names that start with a number to start with an X to match rownames of expression data
-start.with.number &lt;- grep(&quot;^[[:digit:]]&quot;, CTRPv2_AUC$CCL_Name)
-CTRPv2_AUC$CCL_Name[start.with.number] &lt;- paste(&quot;X&quot;, CTRPv2_AUC$CCL_Name[start.with.number], sep = &quot;&quot;)
-#making training PhenData with same layout between CTRP/GDSC ##NB not the same layout
-trainingPhenData &lt;- CTRPv2_AUC
-#names(trainingPhenData)[names(trainingPhenData)== &quot;cpd_name&quot;] &lt;- &quot;Drug.name&quot;
-possibleDrugs &lt;- unique(trainingPhenData$cpd_name)
-
-#Load Training Expression data, convert it to a matrix
-CTRPv2_RNAseq_TPM &lt;- read.delim(&quot;./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt&quot;,  sep = &quot;\t&quot;, stringsAsFactors = F)
-convert.to.matrix &lt;- function(df){
-  mat &lt;- as.matrix(df[,-1])
-  rownames(mat) &lt;- c(t(df[,1]))
-  return(mat)
-  }
-ExprData &lt;- convert.to.matrix(CTRPv2_RNAseq_TPM)
-#make a list of all possible drugs predictions
-CTRPDrugPredictions &lt;- list()
-
-########make a for loop for each drug seperate#################
-for(i in 1:length(possibleDrugs)) { 
-  drug &lt;- possibleDrugs[i]
-  temp &lt;- trainingPhenData[trainingPhenData$cpd_name == drug,] ## Makes temp matrix to extract the AUCs easier
-  AUCs &lt;- as.numeric(temp$Avg_AUC)
-  names(AUCs) &lt;- temp$CCL_Name
-  commonCellLines &lt;- colnames(ExprData)[colnames(ExprData) %in% names(AUCs)]
-  AUCsOrd &lt;- AUCs[commonCellLines]
-  trainDataOrd &lt;- ExprData[, commonCellLines]
-  trainDataOrd &lt;- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
-
-  CTRPDrugPredictions[[1]] &lt;- calcPhenotype(trainingExprData =  trainDataOrd, 
-                                trainingPtype = AUCsOrd, testExprData = testExprData, batchCorrect = batchCorrect, 
-                                powerTransformPhenotype = powerTransformPhenotype, removeLowVaryingGenes = removeLowVaryingGenes, 
-                                minNumSamples = minNumSamples, selection = selection, 
-                                printOutput = printOutput, removeLowVaringGenesFrom = removeLowVaringGenesFrom)
-} #close for loop
-
-names(CTRPDrugPredictions) &lt;- possibleDrugs
-CTRPDrugPredictions_mat &lt;- do.call(rbind, CTRPDrugPredictions)
-save(CTRPDrugPredictions_mat, file= matrix_output_name)
-</code></pre>
-<!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
