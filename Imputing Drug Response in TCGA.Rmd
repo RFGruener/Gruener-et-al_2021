@@ -12,7 +12,11 @@ Do the imputations
  * Load the CTRP/CCLE Training expression and drug data
  * Generate the models and impute using the pRRophetic framework 
 
-Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file.  
+Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. 
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+```
 
 ### First, load packages and set parameters
 ```{r loading packages and setting parameters, results= "hide"}
@@ -27,7 +31,7 @@ lapply(needed_packages, require, character.only = TRUE)
 # Set location and filename  for list/matrix R.data output (ctrp_list_output_name, ctrp_mat_output_name)
 
 dir.create("DataOut")
-matrix_output_name <- "./DataOut/CTRP-Models_on_TCGA-BRCA-RNA.RData"
+matrix_output_name <- "./DataOut/2015CTRP-Models_on_TCGA_BRCA.RData"
 
 # Finally, set parameters of pRRophetic's calcphenotype function 
 #batchCorrect options: "eb" for ComBat, "qn" for quantiles normalization, "standardize", or "none"

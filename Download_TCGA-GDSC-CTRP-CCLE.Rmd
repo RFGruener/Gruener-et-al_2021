@@ -12,7 +12,15 @@ The goal of this file is to: download and install the necessary packages and fil
  * Download the RNA-Seq information
  * Download the TCGA dataset
  
-Important note, certain files are already included in this parent directory including "pRRophetic_0.5.tar.gz" , "All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Particularly for the first two files listed, they are needed to run the imputations and should be downloaded separately.   
+Important note, certain files are already included in this parent directory including "pRRophetic_0.5.tar.gz" , "All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Particularly for the first two files listed, they are needed to run the imputations, the last for Analyzing the imputation data in GDSC. 
+
+pRRophetic_0.5.tar.gz can be downloaded here
+All Cell Line Infor.xlsx is already included in this github repo, it was originally published in our review doi:
+Breast_CCL_Subtypes.csv is already included in this github repo, it was originally part of this publication citation, doi:, supplemental table X
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+```
 
 
 ### Installing required packages (pRRophetic must be downloaded and put in wd or project home)
@@ -35,9 +43,10 @@ if (!requireNamespace("pRRophetic", quietly = TRUE))
 #install other packages that will be used in this script
 if (!requireNamespace(c("qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "biomaRt" , 
                         "TxDb.Hsapiens.UCSC.hg19.knownGene", "glmnet", "gdata", "tidyverse", 
-                        "illuminaHumanv4.db"), quietly = TRUE)) 
-    BiocManager::install(c("qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg19.knownGene", "biomaRt", 
-                           "glmnet", "gdata", "tidyverse", "illuminaHumanv4.db"))
+                        "illuminaHumanv4.db", "broom", "ggpubr"), quietly = TRUE)) 
+    BiocManager::install(c("qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "biomaRt" , 
+                        "TxDb.Hsapiens.UCSC.hg19.knownGene", "glmnet", "gdata", "tidyverse", 
+                        "illuminaHumanv4.db", "broom", "ggpubr"))
 
 dir.create("./DataIn")
 

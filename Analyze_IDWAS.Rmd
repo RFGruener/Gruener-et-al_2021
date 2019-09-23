@@ -1,0 +1,76 @@
+---
+title: "Analyze IDWAS Results"
+output: html_notebook
+---
+
+Now that we have a drug list, we can identify what pathways these drugs target. The list indicates that cell cycle is the most prominent pathway targeted. 
+
+#need to load data from Analyze_TCGA-Imputation-Data as well as the currently non-existant Impute_All_TCGA_for_IDWAS.Rmd and IDWAS_Workflow.Rmd
+
+
+```{r drug targets}
+
+drug_targets <- read_csv("Drug_targets(review).csv") # From Ling and Gruener et al
+
+targets_eta.sq <- eta.sq_preds.subtype %>% 
+  filter(eta.sq > eta.sq[Drug == "tamoxifen"], 
+         sensitive_group == "basal") %>% 
+  select(Drug, sensitive_group, eta.sq, bonf_p.value) %>% 
+  left_join(., drug_targets, by = c("Drug" = "Name in Database")) %>% 
+  select(-c(7:9)) %>% 
+  distinct() 
+
+#Using the review information as well some manual curation, these are the simplified pathways for these compounds 
+simplified_paths <- c("Amino Acid Metabolism", "Cell Cycle", "Cell Cycle", "Protein Stability and Degradation", "Cell Cycle", "Unknown", "Cell Cycle", "Sphingolipid Metabolism", "Cell Cycle", "Cell Cycle", "Protein Stability and Degradation", "STAT Signaling", "Cell Cycle", "Notch Signaling", "Purine Metabolism")
+
+names(simplified_paths) <- c("968", "AZD7762", "BI-2536", "bortezomib", "BRD-K30748066", "BRD-K66453893", "BRD9876:MK-1775 (4:1 mol/mol)", "ceranib-2", "GSK461364", "MK-1775", "MLN2238", "NSC 74859", "PHA-793887", "semagacestat", "triazolothiadiazine")
+
+targets_eta.sq <- targets_eta.sq %>% 
+  mutate(Pathway = simplified_paths[names(simplified_paths) == Drug]) %>% 
+  select(1:4, Pathway)
+
+targets_eta.sq
+
+```
+
+We can go further and use the entire TCGA patient data and find associations between genetic features (i.e. non-synonymous mutations) and the patient's Imputed Sensitivty Scores. If we graph the 9 genes with the most significant values, this is the result.  
+
+
+```{r Biomarker Analysis}
+TCGA_muts_idwa <- read_csv("CTRP_TCGAmuts_allResults_controlFORtissue.csv")
+
+biomarker_eta.sq <- TCGA_muts_idwa %>% 
+  separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>% 
+  right_join(., targets_eta.sq, by = "Drug") %>% 
+  filter(.$Gene %in% unique(.$Gene[.$`FDR (BH corrected)` < 0.0005])) 
+
+biomarker_eta.sq %>% 
+  filter(`FDR (BH corrected)` < 0.01) %>% 
+  arrange(`FDR (BH corrected)`)
+
+biomarker_eta.sq %>% 
+  ggplot(mapping = aes(x = `Effect Size (beta)`, y = -log(`FDR (BH corrected)`), label = Drug)) + 
+    geom_point() + 
+    facet_wrap(~Gene, scales = "free_y") +
+    geom_vline(xintercept = 0, color = "black", linetype = "dashed") + 
+    geom_hline(yintercept = -log(0.01), color = "red") + 
+    labs(title = "Top Mutation-Imputed-Drug Associations in TCGA",
+         y = "-log(FDR)") + 
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+As we can see, even though all drugs are predicted to be more sensitive in TCGA TNBC patients, we can see that there are a variety of gene-drug associations. Some are highly specific, such as NFE2L2 with NSC-74859, 
+
+We can look at the FDR corrected p-values for all the mutation-drug associations in the following table (each value in this table is an FDR corrected p-value for the respective gene and drug)
+
+
+```{r}
+top_gene.drug_associations_table <- biomarker_eta.sq %>% 
+  select(Drug, Gene, `FDR (BH corrected)`) %>% 
+  spread(key = Gene, value = `FDR (BH corrected)`)
+
+top_gene.drug_associations_table
+```
+

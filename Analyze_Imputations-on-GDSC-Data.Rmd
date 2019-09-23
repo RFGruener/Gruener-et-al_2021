@@ -3,30 +3,44 @@ title: "Analyze: GDSC (Cell Line) Imputations"
 output: html_notebook
 ---
 
+Analysis outline: 
+
+  * Load AZD1775 imputations in GDSC and the actual measured responses from GDSC
+  * Format the data and combine the datasets 
+  * Perform correlation analysis between imputed and measured responses 
+  * Get cell line subtypes for the GDSC cell lines
+  * Subtype the cell lines into TNBC and RPBC CCLs and perform t-test and see if the results also indicate that AZD1775 is more sensitive in TNBC cell lines 
+
 ```{r, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 ```
 
 
 ```{r load some stuff, include = FALSE}
-library(tidyverse)
-library(readxl)
-library(magrittr)
-library(broom)
+if (!requireNamespace("TCGAbiolinks", quietly = TRUE))
+    BiocManager::install("TCGAbiolinks")
 
-load("MK1775CTRP_in_GDSC.Rdata")
+if (!requireNamespace(c("broom", "ggpubr"), quietly = TRUE))
+    install.packages(c("broom", "ggpubr"))
+library(TCGAbiolinks)
+library(tidyverse)
+library(broom)
+library(readxl)
+
+load("./DataOut/MK1775CTRP_in_GDSC.Rdata") #use the matrix_output_name from IMputing Drug Response in GDSC
 
 preds_fromCTRP <- as_tibble(t(CTRPDrugPredictions_mat), rownames = "CCLs") %>% 
   separate(CCLs, sep = "_", into = c("CCL", NA))
-GDSC_IC50s <- read_excel("./DataIn/GDSC/GDSC_IC50_July2019.xlsx")
-cell_lines <- read_excel("All Cell Line Infor.xlsx")
+GDSC_IC50s <- read_excel("./DataIn/GDSC/GDSC_IC50_July2019.xlsx") #read the drug response data downloaded earlier
+cell_lines <- read_excel("All Cell Line Infor.xlsx") #read in the Cell Line info from our review that was included in this repo, otherwise needs to be downloaded separately (see Download_TCGA... .Rmd file)
 ccls <- cell_lines %>% select(`Harmonized Identifier`, `Study Cell Line Name`, `Cancer Statistics 2017 Sub-Category`)
 
 
 ```
 
 
-```{r}
+```{r formatting}
+#format GDSC IC50 values to prepare for merging with the predictions
 GDSCtomerge <- GDSC_IC50s %>% 
   select(CELL_LINE_NAME, DRUG_NAME, LN_IC50) %>% 
   filter(DRUG_NAME == "MK-1775") %>% 
@@ -34,12 +48,13 @@ GDSCtomerge <- GDSC_IC50s %>%
   select(-CELL_LINE_NAME) %>% 
   distinct() #distinct is needed because we are using the Study Cell Line Name which includes multiple studies
 
+#format predictions values to prepare for merging with IC50 values
 predsToMerge <- preds_fromCTRP %>% 
   left_join(., ccls, by = c("CCL" = "Study Cell Line Name")) %>% 
   distinct() %>% #distinct is needed because we are using the Study Cell Line Name which includes multiple studies, so the same name might be listed twice
   drop_na(`Harmonized Identifier`) #there are 8 cell lines that did not match with a Cellosaurus ID, which I am simply dropping for convenience
 
-
+#merge two datasets
 Merge_preds_GDSC.IC50 <- left_join(predsToMerge, GDSCtomerge, by = "Harmonized Identifier")
 
 
@@ -47,84 +62,84 @@ Merge_preds_GDSC.IC50 <- left_join(predsToMerge, GDSCtomerge, by = "Harmonized I
 ```
 
 
+To begin, after merging the predicted and measured datasets, make a graph of imputed and measured response to MK-1775 for all of GDSC and only the breast cancer cell lines in GDSC, and see how well they correlate. 
+
 ```{r plots}
 
-theme_set(theme_bw())
+theme_set(theme_bw()) #sets the theme for ggplot
 
-# Merge_preds_GDSC.IC50 %>% 
-#   drop_na() %>% 
-#   summarize(correlation = cor(`MK-1775`, LN_IC50),
-#             n = length(CCL_Name)) %>%
-#   filter(n > 50) %>% 
-#   ggplot() + 
-#     geom_histogram(aes(x = correlation)) + 
-#     geom_vline(mapping = aes(xintercept = correlation[cpd_name == "mk1775"]), col = "red")
-
+#Make graph of imputed and measured response to MK-1775 for all of GDSC
 Merge_preds_GDSC.IC50 %>% 
   drop_na() %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
     geom_smooth(method = "lm") + 
-    ggpubr::stat_cor() + 
+    ggpubr::stat_cor(method = "spearman") + 
     labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity in GDSC", 
          x = "Predicted Sensitivty Score")
 
-
+#Make the same graph of imputed and measured response to MK-1775, but for only the breast cancer cell lines in GDSC
 Merge_preds_GDSC.IC50 %>% 
   drop_na() %>% 
   filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
     geom_smooth(method = "lm") + 
-    ggpubr::stat_cor() + 
+    ggpubr::stat_cor(method = "spearman") + 
     labs(title = "Correlation of Predicted and Actual MK1775 Sensitivity in GDSC Breast CCLs",
          x = "Predicted Sensitivty Score")
 
-
-
-
 ```
 
+As we can see, they correlate very strongly. However, some of these cell lines are inevitably in both the training and testing datasets. Thus, it is important to perform a similar analysis but this time with only the cell lines that are unique to GDSC, that is those that are truly independent. 
 
 ```{r anti-join analysis}
 
-CTRP_aucs <- read_delim("./DataIn/CTRPv2/CTRPv2_AUC_clean.txt", delim = "\t")
+CTRP_aucs <- read_delim("./DataIn/CTRPv2/CTRPv2_AUC_clean.txt", delim = "\t") #read in data used to make the imputations and downloaded in the download... .Rmd file
 
+#format
 Ccls_CTRP <- CTRP_aucs %>% 
   filter(cpd_name == "MK-1775") %>% 
   left_join(., ccls, by = c("CCL_Name" = "Study Cell Line Name")) %>% 
   distinct() %>% 
   drop_na(`Harmonized Identifier`)
 
-#check to make sure 
+#check to make sure nothing is missing
 CTRP_aucs %>% filter(cpd_name == "MK-1775") %$% length(.$cpd_name) == 
   length(na.omit(Ccls_CTRP$`Harmonized Identifier`))
 
+#use anti_join to find the CCLs unique to GDSC, ie removing ccls in GDSC that are also in CTRP
 non_modeled_CCLs <- anti_join(GDSCtomerge, Ccls_CTRP, by = "Harmonized Identifier")
 
+#graph measured and predicted response in all GSDC cell lines that are unique to GDSC. Probably should have made a graphing function, but oh well. 
 Merge_preds_GDSC.IC50 %>% 
   semi_join(., non_modeled_CCLs) %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
     geom_smooth(method = "lm") + 
-    ggpubr::stat_cor() + 
+    ggpubr::stat_cor(method = "spearman") + 
     labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Cell Lines Unique to GDSC", 
          x = "Predicted Sensitivty Score")
 
+#graph measured and predicted response in only BRCA GSDC cell lines that are unique to GDSC, n = 16
 Merge_preds_GDSC.IC50 %>% 
   semi_join(., non_modeled_CCLs) %>% 
   filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
     geom_smooth(method = "lm") + 
-    ggpubr::stat_cor() + 
+    ggpubr::stat_cor(method = "spearman") + 
     labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Breast Cancer Cell Lines Unique to GDSC", 
          x = "Predicted Sensitivty Score")
 
 ```
 
 
-Now, does the cell line data also suggest that TNBC cell lines are more sensitive to the Wee1 Inhibitor. Let's stratify both the actual and predicted response by cell line type. THis is mostly stolen from my Cell-Line-Only_Drug-Response_Analysis R.proj
+As we can see, even in the unique to GDSC cell lines, the predicted and measured response correlates well. 
+
+## TNBC vs RPBC Cell Line Analysis
+
+Now, does the cell line data also suggest that TNBC cell lines are more sensitive to the Wee1 Inhibitor. Let's stratify both the actual and predicted response by cell line type. This is mostly stolen from my Cell-Line-Only_Drug-Response_Analysis R.proj
 
 ### Cell Line Only Analysis
 
@@ -134,7 +149,7 @@ Shown below is some of the information these data files contain.
 
 ```{r data_download, cache=TRUE}
 print("Breast cancer cell line info")
-breast_cell_line_info <- read_csv(file = "Breast_CCL_Subtypes.csv")
+(breast_cell_line_info <- read_csv(file = "Breast_CCL_Subtypes.csv"))
 ```
 
 ##### Cleaning and Subsetting the data
@@ -168,7 +183,7 @@ missing_gdsc$CCL_Name
 
 ```
 
-Those 8 values will be manually curated. The top 10 rows of the final cleaned up data frame without any missing NA values and with the relevant columns selected is displayed below for GDSC and CTRP respectively: 
+Those 8 values will be manually curated. The top 10 rows of the final cleaned up data frame without any missing NA values and with the relevant columns selected is displayed below for GDSC: 
 
 ```{r clean_subset_2}
 #There are 8 from GDSC, but the previous script found 12 when I also included CTRP, so I'm just using these 12 values 
@@ -181,6 +196,8 @@ GDSC_breast <- GDSC_breast %>%
   mutate(Subtype= if_else(is.na(Subtype), missing_subtype[CCL_Name], Subtype)) %>% 
   mutate(TNBC = ifelse(Subtype %in% c("TN", "TNA", "TNB"), "TNBC", "RPBC"))
 
+head(GDSC_breast)
+
 ```
 
 
@@ -191,8 +208,7 @@ GDSC_t.test_results <- GDSC_breast %>%
   group_by(DRUG_NAME) %>% 
   do(tidy(t.test(LN_IC50 ~ TNBC, data = .))) %>% # thanks second answer here
   # https://stackoverflow.com/questions/26244321/dplyr-summarise-multiple-columns-using-t-test
-  ##I now need to change names because it is unclear what the values are. 
-  #it goes in alphabetical order, so Estimate is the mean IC50 when TNBC=="no" minus the mean of TNBC=="yes" 
+  ##note the t.test function goes in alphabetical order, so Estimate is the mean IC50 when TNBC=="RPBC" minus the mean of TNBC=="TNBC" 
   mutate(FDR = p.adjust(p.value, method = "fdr"), 
          more_sensitive = if_else(estimate > 0, "TNBC", "non-TNBC")) #this summarizes 
           ##the effect direction. The smaller the number, the more sensitive the cell was to this drug
@@ -226,6 +242,6 @@ GDSC_breast %>%
 
 As we can see, there are `r length(GDSC_t.test_results$FDR[GDSC_t.test_results$FDR < 0.05])` significant results in GDSC after multiple comparision correction. 
 
-Also, it is interesting to note that typically the direction is in favor of TNBC being *more sensitive*. In GDSC, even if we  use a p.value of 0.05 (note, FDR not p-value), there are `r sum(GDSC_t.test_results[GDSC_t.test_results$FDR < 0.05,]$more_sensitive == "TNBC")` drugs that are more effective on TNBC cells and only `r sum(GDSC_t.test_results[GDSC_t.test_results$FDR < 0.05,]$more_sensitive == "non-TNBC")` shown to be more effective on the RPBC cells. 
+Also, it is interesting to note that typically the direction is in favor of TNBC being *more sensitive*. In GDSC, even if we  use a FDR of 0.05 (note, FDR not p-value), there are `r sum(GDSC_t.test_results[GDSC_t.test_results$FDR < 0.05,]$more_sensitive == "TNBC")` drugs that are more effective on TNBC cells and only `r sum(GDSC_t.test_results[GDSC_t.test_results$FDR < 0.05,]$more_sensitive == "non-TNBC")` shown to be more effective on the RPBC cells. 
 
 
