@@ -1,0 +1,55 @@
+---
+title: "GSEA: WEE1 Imputations"
+output: html_notebook
+---
+
+To ensure our imputations are picking up on biologically meaningful information, I will perform a GSEA using the patient RNA-Seq data with their imputed Wee1 inhibtion score as the continuous phenotype to cluster the patients. 
+
+According to the [documentation online](http://software.broadinstitute.org/cancer/software/gsea/wiki/index.php/R-GSEA_Readme), the R GSEA package from the Broad Institute only allows for GSEA to be performed with 2 categorical variables. Therefore this document will only begin by getting the [file formats](http://software.broadinstitute.org/cancer/software/gsea/wiki/index.php/Data_formats#TXT:_Text_file_format_for_expression_dataset_.28.2A.txt.29) in place, as well as some documentation on how the analysis was performed using GenePattern.
+
+First, Gene expression data is just that from TCGA and .txt files are fine.
+
+```{r Gene Expression Data}
+library(readr)
+
+# load  the breast cancer RNA-seq file downloaded previously
+tpmDatMat <- read_delim(file = "./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt", as.is=T)
+tpmDatMat_tpm <- tpmDatMat[-1,which(tpmDatMat[1,] == "scaled_estimate")]
+tpmDatMat_tpm <- apply(tpmDatMat_tpm, 2, as.numeric)
+geneNames <- do.call(cbind, strsplit(tpmDatMat[, "Hybridization.REF"], "|", fixed=TRUE))[1,][-1]
+rownames(tpmDatMat_tpm) <- geneNames
+colnames(tpmDatMat_tpm) <- substr(colnames(tpmDatMat_tpm), 1, 28)
+tpmDatMat_tpm_logged <- log((tpmDatMat_tpm*1000000)+1) # transform the data
+#remove adjacent normal RNA-seq samples
+testExprData <- tpmDatMat_tpm_logged[,-grep(pattern = ".11A.|.11B.|.10A.|.10B.", colnames(tpmDatMat_tpm_logged))]
+
+#Format names to remove unidentifiable genes "?", average duplicates, then remove any rows where the expression is 0 in all patients
+testExprData <- testExprData[rownames(testExprData) != "?",]
+dups <- rownames(testExprData)[duplicated(rownames(testExprData))]
+dupsExprData <- testExprData[which(rownames(testExprData) %in% dups),]
+average_dups <- aggregate(x = dupsExprData, by = list(rownames(dupsExprData)), FUN = mean, na.rm = TRUE)
+rownames(average_dups) <- average_dups$Group.1
+testExprData <- rbind(testExprData[-(which(rownames(testExprData) %in% dups)),], average_dups[,-1])
+testExprData <- testExprData[rowSums(testExprData) != 0,]
+
+#finally, add a column as the second column because the format has to be: "The first line contains the labels Name and Description followed by the identifiers for each sample in the dataset. NOTE: The Description column is intended to be optional, but there is currently a bug such that it is treated as required. We hope to fix this in a future release. If you have no descriptions available, a value of NA will suffice." 
+
+GSEAExprData <- cbind(DESCRIPTION = NA, testExprData)
+data.table::setDT(GSEAExprData, keep.rownames = "NAME")
+
+write_tsv(GSEAExprData, path = "./DataOut/GSEA_Expr_Data.txt")
+
+```
+
+Next, we have to get the imputed Wee1 data and format it to match the .cls format
+
+```{r Imputed AZD1775 Response}
+load("./DataOut/2015CTRP-Models_on_TCGA_BRCA.RData")
+
+MK1775_phen <- CTRPDrugPredictions_mat[rownames(CTRPDrugPredictions_mat) == "MK-1775",]
+identical(colnames(GSEAExprData)[3:1100], names(MK1775_phen)) #check to make sure the order is the same, they are. Skip first two rows because they are the artificial ones I added NAME and Desciption
+PhenGSEAData <- rbind(MK1775_phen)
+write.table(PhenGSEAData, file = "./DataOut/GSEA_Phen_Data.cls", row.names = F, col.names = F)
+
+```
+

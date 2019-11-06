@@ -137,6 +137,35 @@ Merge_preds_GDSC.IC50 %>%
 
 As we can see, even in the unique to GDSC cell lines, the predicted and measured response correlates well. 
 
+We can follow this up by checking how well the cell lines that do overlap correlate with their measured sensitivity data to get a sense of the maximum correlation that should be expected.
+
+```{r overlap analysis}
+#use inner_join to find the CCLs that overlap with to GDSC, ie this time keeping ccls in GDSC that are also in CTRP
+overlapping_CCLs <- inner_join(GDSCtomerge, Ccls_CTRP, by = "Harmonized Identifier")
+
+#graph measured and predicted response in all GSDC cell lines that are unique to GDSC. Probably should have made a graphing function, but oh well. 
+Merge_preds_GDSC.IC50 %>% 
+  semi_join(., overlapping_CCLs) %>% 
+  ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
+    geom_point() + 
+    geom_smooth(method = "lm") + 
+    ggpubr::stat_cor(method = "spearman") + 
+    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Cell Lines Unique to GDSC", 
+         x = "Predicted Sensitivty Score")
+
+#graph measured and predicted response in only BRCA GSDC cell lines that are unique to GDSC, n = 16
+Merge_preds_GDSC.IC50 %>% 
+  semi_join(., overlapping_CCLs) %>% 
+  filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
+  ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
+    geom_point() + 
+    geom_smooth(method = "lm") + 
+    ggpubr::stat_cor(method = "spearman") + 
+    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Breast Cancer Cell Lines Unique to GDSC", 
+         x = "Predicted Sensitivty Score")
+```
+
+
 ## TNBC vs RPBC Cell Line Analysis
 
 Now, does the cell line data also suggest that TNBC cell lines are more sensitive to the Wee1 Inhibitor. Let's stratify both the actual and predicted response by cell line type. This is mostly stolen from my Cell-Line-Only_Drug-Response_Analysis R.proj

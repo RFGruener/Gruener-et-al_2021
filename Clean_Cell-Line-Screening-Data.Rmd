@@ -20,6 +20,7 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 
 ```{r Load Packages and Read in the Data}
 library(tidyverse)
+library(readxl)
 #Read in CTRPv2 Data (AUC data, compound info, cell line info, and experiment info) 
 CTRPv2_AUC <- read_delim("./DataIn/CTRPv2/v20.data.curves_post_qc.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 CTRPv2_cpd <- read_delim("./DataIn/CTRPv2/v20.meta.per_compound.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
@@ -111,6 +112,8 @@ The CTRP data has IDs for cell lines and compounds, this will match the AUC valu
     
 ```
 
+
+Then clean the CCLE RNA-Seq data
 
 ```{r CCLE RNA-Seq Cleaning}
 

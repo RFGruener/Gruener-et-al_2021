@@ -108,7 +108,7 @@ for(i in 1:length(possibleDrugs)) {
   trainDataOrd <- ExprData[, commonCellLines]
   trainDataOrd <- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
 
-  CTRPDrugPredictions[[1]] <- calcPhenotype(trainingExprData =  trainDataOrd, 
+  CTRPDrugPredictions[[i]] <- calcPhenotype(trainingExprData =  trainDataOrd, 
                                 trainingPtype = AUCsOrd, testExprData = testExprData, batchCorrect = batchCorrect, 
                                 powerTransformPhenotype = powerTransformPhenotype, removeLowVaryingGenes = removeLowVaryingGenes, 
                                 minNumSamples = minNumSamples, selection = selection, 

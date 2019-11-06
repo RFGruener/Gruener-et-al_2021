@@ -1,0 +1,10 @@
+id	filename	md5	size	state
+0a40467f-9495-4c5b-b56e-3347a3ee0572	0a40467f-9495-4c5b-b56e-3347a3ee0572/nationwidechildrens.org_clinical_radiation_brca.txt	13885c9a052e6874e14158139982bb60	154883	validated
+1e6b79ff-9787-4cbe-b19d-ebabb6b43589	1e6b79ff-9787-4cbe-b19d-ebabb6b43589/nationwidechildrens.org_clinical_drug_brca.txt	a83b5130bd671998aa1ec339a542121d	961048	validated
+22f38342-3f1a-47e5-9025-c19719fa21d0	22f38342-3f1a-47e5-9025-c19719fa21d0/nationwidechildrens.org_clinical_follow_up_v1.5_brca.txt	0b465b3f0b9bddf2416ccd74994805a4	117592	validated
+403b5cef-8173-47c7-b56a-cc94dcfbb2e3	403b5cef-8173-47c7-b56a-cc94dcfbb2e3/nationwidechildrens.org_clinical_follow_up_v2.1_brca.txt	29f6255a8ddac7f43b3a2a30fe3e2b64	372177	validated
+62d4515f-a30b-4b1a-b2dd-c8bf9476e803	62d4515f-a30b-4b1a-b2dd-c8bf9476e803/nationwidechildrens.org_clinical_follow_up_v4.0_brca.txt	002ad34525a69b2603c7947c53260b82	123240	validated
+8162d394-8b64-4da2-9f5b-d164c54b9608	8162d394-8b64-4da2-9f5b-d164c54b9608/nationwidechildrens.org_clinical_patient_brca.txt	f271f56d44b62d41bd6ddb0d26e525b4	1700943	validated
+a88c168e-4bba-4bd2-9c0c-77934444cc1c	a88c168e-4bba-4bd2-9c0c-77934444cc1c/nationwidechildrens.org_clinical_nte_brca.txt	4ab1b571056283419be174ab1e1f875a	69088	validated
+a9baecf0-5549-4396-8805-a6d1681d11cd	a9baecf0-5549-4396-8805-a6d1681d11cd/nationwidechildrens.org_clinical_follow_up_v4.0_nte_brca.txt	0ac1c35b77b9278e95086c124808c759	47061	validated
+f434b393-9e32-4ca2-aa1a-3b0de36b5ffe	f434b393-9e32-4ca2-aa1a-3b0de36b5ffe/nationwidechildrens.org_clinical_omf_v4.0_brca.txt	4f6606f6b12f952e0339a40396cd7c92	39381	validated
