@@ -1,0 +1,166 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r Analysis on every individual experiment}
+library(tidyverse)
+library(magrittr)
+
+files <- dir("./DataIn/My Cell Line Data/")
+broken_string <- sapply(str_split(files, "_|\\."), '[', c(2,3,4))
+cell_line <- broken_string[1,]
+plate_list <- broken_string[2,]
+date <- broken_string[3,]
+
+experiment_cell_date <- c()
+for(i in 1:length(dir("./DataIn/My Cell Line Data/"))) {
+   plate <- plate_list[i]
+   trial <- readxl::read_xls(path = paste0("./DataIn/My Cell Line Data/", files[i]))
+   
+   trial_format <- trial %>% 
+      dplyr::select(Well, CPS = `CPS (CPS)`) %>% 
+      group_by(Well) %>% 
+      summarize(Average_reads = mean(CPS)) %>% 
+      ungroup() %>% 
+      separate(Well, sep = 1, into = c("Taxol_nM", "AZD_nM")) %>%
+      arrange(AZD_nM) %>% 
+      mutate(group = c(rep("control", 6), rep("experiment", 54))) %>% 
+      group_by(Taxol_nM) %>% 
+      mutate(AZD_nM = c(0, 0, 25, 50, 100, 200, 400, 800, 1600, 3200)) %>% 
+      ungroup() %>% 
+      {if(plate == "plate1") mutate(., Taxol_nM = if_else(Taxol_nM %in% LETTERS[2:3], 0, 
+                                                         if_else(Taxol_nM %in% LETTERS[4:5], 0.5, 1))) 
+         else . } %>% 
+      {if(plate == "plate2") mutate(., Taxol_nM = if_else(Taxol_nM %in% LETTERS[2:3], 2.5, 
+                                                            if_else(Taxol_nM %in% LETTERS[4:5], 5, 10))) 
+         else . }
+   trial_format$Taxol_nM[trial_format$group == "control"] = 0
+   avg_controls <- mean(trial_format$Average_reads[trial_format$group == "control"])
+   trial_format <- mutate(trial_format, relative_viability = (Average_reads/avg_controls)*100) %>% 
+      filter(group == "experiment") %>% 
+      group_by(Taxol_nM, AZD_nM) %>% 
+      summarize(Viability = mean(relative_viability))
+   experiment_cell_date[i] <- paste(cell_line[i], date[i], sep = "_")
+   
+   assign(paste(cell_line[i], date[i], plate_list[i], sep = "_"), trial_format)
+}
+
+unique_experiments <- unique(experiment_cell_date)
+broken_string <- sapply(str_split(unique_experiments, "_|\\."), '[', 1:2)
+cell_line <- broken_string[1,]
+date <- broken_string[2,]
+
+for(i in 1:length(unique_experiments)) {
+      replicate <- ls(pattern = paste0(unique_experiments[i], "_"))
+         exp <- bind_rows(eval(parse(text = replicate[1])), eval(parse(text = replicate[2])))
+         assign(paste(cell_line[i], date[i], sep = "_"), exp)
+}
+
+rm(list = ls(pattern = "plate"))
+
+library(drc)
+
+for(i in 1:length(unique_experiments)) {
+print(
+   eval(parse(text = unique_experiments[i])) %>% 
+      filter(AZD_nM != 0) %>% 
+      mutate(AZD_nM = log(AZD_nM)) %>% 
+      ggplot(aes(x = AZD_nM, y = Viability, color = as.factor(Taxol_nM))) + 
+      geom_smooth(method = drc::drm, method.args = list(fct = L.3()), se = F) + 
+      geom_point() +
+      theme_bw()+ 
+      ylim(0, 140) +
+      labs(title = unique_experiments[i]) 
+)  
+}
+      
+
+```
+
+
+```{r Search for Synergy}
+
+viability_to_inhibtion <- function(percent_viability){
+   ifelse(  (percent_viability/100) - 1 > 0, 0, abs((percent_viability/100) - 1)  )
+}
+
+Bliss_independence <- function(a, b){
+   independence <- viability_to_inhibtion(a) + viability_to_inhibtion(b) - viability_to_inhibtion(a)*viability_to_inhibtion(b)
+   return(independence)
+}
+
+for(i in 1:length(unique_experiments)) {
+
+synergy_search <- eval(parse(text = unique_experiments[i])) %>% 
+      group_by(Taxol_nM) %>% 
+      mutate(Taxol_alone = Viability[AZD_nM == 0]) %>% 
+      group_by(AZD_nM) %>% 
+      mutate(AZD_alone = Viability[Taxol_nM == 0]) %>% 
+      ungroup() %>% 
+      mutate(inhibition = viability_to_inhibtion(Viability), 
+             Highest_single_agent = if_else(Taxol_alone < AZD_alone, viability_to_inhibtion(Taxol_alone), viability_to_inhibtion(AZD_alone)), 
+               Highest_single_agent_difference = Highest_single_agent - inhibition,
+               CI_HSA =  Highest_single_agent/inhibition, 
+               BI_combination = Bliss_independence(a = AZD_alone, b = Taxol_alone), 
+               CI_BI = BI_combination/inhibition)   
+      
+
+assign(paste(cell_line[i], date[i], sep = "_"), synergy_search)
+```
+
+
+```{r Graphing Function}
+
+synergy_grapher <- function(dataset, filler){
+
+ggplot(dataset, aes(x = as.factor(AZD_nM), y = as.factor(Taxol_nM), fill = eval(parse(text = filler)))) + 
+      geom_tile() +
+   {if(filler == "Highest_single_agent_difference") 
+      scale_fill_gradient2(low = "red", mid = "white", high = "blue", 
+                           midpoint = 0, space = "Lab", na.value = "grey50", 
+                           guide = "colourbar", aesthetics = "fill", limits = c(-0.50,0.50)) 
+      else scale_fill_gradient2(low = "red", mid = "white", high = "blue", 
+                           midpoint = 1, space = "Lab", na.value = "grey50", 
+                           guide = "colourbar", aesthetics = "fill", limits = c(0.01,2)) } + 
+      labs(title = paste(unique_experiments[i], filler, sep = "_")) +
+   theme(legend.position = "none") + 
+     geom_text(aes(label = round(eval(parse(text = filler)), 2)))
+
+
+}
+
+for(i in 1:length(unique_experiments)) {
+   eval(parse(text = unique_experiments[i])) %T>% 
+     synergy_grapher(dataset = ., filler = "Highest_single_agent_difference") %T>% 
+     synergy_grapher(dataset = ., filler = "CI_HSA") %T>% 
+     synergy_grapher(dataset = . ,filler = "CI_BI")
+   
+   
+}
+
+```
+
+
+
+```{r, fig.height = 5, fig.width= 15}
+for(i in 1:length(unique_experiments)) {
+   ds <- eval(parse(text = unique_experiments[i])) 
+    s1 <- synergy_grapher(dataset = ds, filler = "Highest_single_agent_difference") 
+    s2 <-  synergy_grapher(dataset = ds, filler = "CI_HSA") 
+    s3 <-  synergy_grapher(dataset = ds, filler = "CI_BI")
+    gridExtra::grid.arrange(s1, s2, s3, nrow = 1, widths = c(10, 10, 10))
+   
+   
+}
+
+
+   
+```
+
+
+
+
+
