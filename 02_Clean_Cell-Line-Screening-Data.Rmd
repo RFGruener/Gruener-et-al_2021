@@ -12,7 +12,7 @@ The goal of this file is to clean the GDSC and CTRP data files
 As mentioned previously, I checked the most recent GDSC data (on 8/20/2019) and the 2016 expression data already in the pRRophetic package and they were identical, so I choose just to run with that. 
     
     
-Also, note, here the script acts on duplicated geneIDs (removes them for CTRP), but pRRophetic predict has an option to do that (defaults to averaging, but can remove them)
+Also, note, here the script acts on duplicated geneIDs (removes them for CTRP). Technically the  pRRopheticpredict function from pRRophetic has an option to do that (defaults to averaging, but can remove them)
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, message = FALSE)

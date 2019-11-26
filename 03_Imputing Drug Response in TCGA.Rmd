@@ -15,10 +15,13 @@ Do the imputations
 Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. 
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = T, results = "hide", message = "hide")
 ```
 
 ### First, load packages and set parameters
+
+The necessary packages and files should have been download in file 01_Downlaod
+
 ```{r loading packages and setting parameters, results= "hide"}
 set.seed(12345)
 #Loading Packages
@@ -72,7 +75,7 @@ testExprData <- tpmDatMat_tpm_logged[,-grep(pattern = ".11A.|.11B.|.10A.|.10B.",
 
 ### Third, perform Imputations:
 
-Perform imputations for GDSC or CTRP
+Perform imputations using CTRP/CCLE datasets as the training dataset
 
 ```{r CTRP Imputations, message = FALSE}
 
@@ -81,7 +84,6 @@ CTRPv2_AUC <- read.delim("./DataIn/CTRPv2/CTRPv2_AUC_clean.txt", sep = "\t", str
 #Altering cell line names that start with a number to start with an X to match rownames of expression data
 start.with.number <- grep("^[[:digit:]]", CTRPv2_AUC$CCL_Name)
 CTRPv2_AUC$CCL_Name[start.with.number] <- paste("X", CTRPv2_AUC$CCL_Name[start.with.number], sep = "")
-#making training PhenData with same layout between CTRP/GDSC ##NB not the same layout
 trainingPhenData <- CTRPv2_AUC
 #names(trainingPhenData)[names(trainingPhenData)== "cpd_name"] <- "Drug.name"
 possibleDrugs <- unique(trainingPhenData$cpd_name)

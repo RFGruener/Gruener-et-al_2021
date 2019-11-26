@@ -28,7 +28,6 @@ if (!requireNamespace("TCGAbiolinks", quietly = TRUE))
 if (!requireNamespace(c("broom", "grid", "ggrepel", "lsr"), quietly = TRUE))
     install.packages("broom", "grid", "ggrepel", "lsr")
 
-
 library(TCGAbiolinks)
 library(tidyverse)
 library(broom)
@@ -38,7 +37,9 @@ library(ggrepel)
 
 theme_set(theme_bw())
 
+```
 
+```{r download TCGA clinical data}
 query <- GDCquery(project = "TCGA-BRCA", 
                   data.category = "Clinical",
                   data.type = "Clinical Supplement", 
@@ -64,27 +65,7 @@ TCGA_subs <- TCGAquery_subtype(tumor = "brca") #easily get TCGA PAM50 status thi
 
 BRCA_pam50 <- TCGA_subs %>% select(patient, PAM50 = BRCA_Subtype_PAM50) %>% filter(PAM50 != "NA")
 
-BRCA_clinical <- left_join(BRCA_clinical, BRCA_pam50, by = c("bcr_patient_barcode" = "patient")) 
-
-######################## note ###################
-#####I could look into doing the KI-67 subtyping to futher delineate the ER/PR+ samples, but TCGA doesn't have KI-67 staining. I could potentially use expression, which is what I have below, but the cutoff wouldn't be clear (expression isn't used clinically), so I have opted to skip it for now. 
-# tpmDatMat <- read.delim(file = "./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt", as.is=T)
-# tpmDatMat <- tpmDatMat[c(1,grep(pattern = "MKI67", x = tpmDatMat[,"Hybridization.REF"])),]
-# tpmDatMat_tpm <- tpmDatMat[-1,which(tpmDatMat[1,] == "scaled_estimate")]
-# tpmDatMat_tpm <- apply(tpmDatMat_tpm, 2, as.numeric)
-# geneNames <- do.call(cbind, strsplit(tpmDatMat[, "Hybridization.REF"], "|", fixed=TRUE))[1,][-1]
-# rownames(tpmDatMat_tpm) <- geneNames
-# colnames(tpmDatMat_tpm) <- gsub("\\.", "-", x = substr(colnames(tpmDatMat_tpm), 1, 16))
-# tpmDatMat_tpm_logged <- log((tpmDatMat_tpm*1000000)+1) # transform the data
-# tpmDatMat_tpm_logged <- tpmDatMat_tpm_logged[,-grep(pattern = ".11A.|.11B.|.10A.|.10B.", colnames(tpmDatMat_tpm_logged))]
-# KI67_expression <- t(tpmDatMat_tpm_logged) %>% as_tibble(rownames = "bcr_patient_barcode") %>%
-#     mutate(bcr_patient_barcode = substr(bcr_patient_barcode, 1, 12))
-# 
-# BRCA_clin_ki67 <- left_join(BRCA_clinical, KI67_expression)
-# 
-# BRCA_clin_ki67 %>%
-#     filter(Clin_Subtype == "ER/PR+") %>%
-#     filter(MKI67 < 1.8)
+BRCA_clinical <- full_join(BRCA_clinical, BRCA_pam50, by = c("bcr_patient_barcode" = "patient")) 
 
 ```
 
@@ -96,11 +77,11 @@ table(BRCA_clinical$PAM50)
 
 ```
 
-Ki-67 staining is not available, so we cannot do the traditional Lum A and Lum B groups for the clinical subtyping.  
+Ki-67 staining is not available in TCGA, so we cannot do the traditional Lum A and Lum B groups for the clinical subtyping of ER+ tumors. However, this doesn't impact us too much as there we are focused on TNBC which can be easily defined in our dataset.  
 
-### Prediction Data
+### Identifying Compounds Predicted To Be More Effective in TNBC
 
-Here we load and format the prediction dataset, then we merge it with the clinical data we previously downloaded
+First we need to load and format the prediction dataset, then we merge it with the clinical data we previously downloaded
 
 ```{r format predictions, include = FALSE}
 load("./DataOut/2015CTRP-Models_on_TCGA_BRCA.RData")
@@ -116,9 +97,19 @@ preds.subtype <- left_join(BRCA_preds, BRCA_clinical, by = c("Patient_ID" = "bcr
 
 ```
 
-We can subset the predictions and perform t-tests. 
+To look for compounds that are more effective in TNBC vs other breast cancers (i.e. receptor positive or RPBC), we can subset the patients into their corresponding TNBC status and perform t-tests on the imputed drug data for each drug. Then we can correct for multiple test corrections. We can then see how many drugs are expected to be more effective in TNBC compared to RPBCs, which is shown in the below table.  
 
 ```{r Statistical testing}
+t.tst_preds.subtype <- preds.subtype %>% 
+  group_by(Drug) %>% 
+  do(tidy(t.test(PSS~TNBC_status, data = .))) %>%
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
+  mutate(log10_p.correct = -log10(bonf_p.value)) 
+
+t.tst_preds.subtype %>% filter(bonf_p.value < 0.001) %>% mutate(Sensitive = if_else(estimate > 0, "TNBC", "RPBC")) %>% count(Sensitive)
+
+#We could also look at the results via ANOVA and look for the most significantly different values between the clinical subgroups described before or the PAM50 subgroups. I'm keeping this analysis here but some of this may become supplemental.  
 aov_preds.subtype <- preds.subtype %>%
   group_by(Drug) %>%
   do(tidy(aov(.$PSS ~ .$PAM50))) %>%
@@ -133,39 +124,47 @@ clin_aov_preds.subtype <- preds.subtype %>%
   filter(term == ".$Clin_Subtype") %>%
   mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni"))
 
-t.tst_preds.subtype <- preds.subtype %>% 
-  group_by(Drug) %>% 
-  do(tidy(t.test(PSS~TNBC_status, data = .))) %>%
-  ungroup() %>% 
-  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni"))
 
-t.tst_preds.subtype %>% mutate(Sensitive = if_else(estimate > 0, "TNBC", "RPBC")) %>% count(Sensitive)
 
 ```
 
 
-As a note/aside: 
-Based on t-tests, even with a bonferroni correction, most of the values are statistically signifcant. Ineed `r sum(t.tst_preds.subtype$bonf_p.value < 0.05/length(unique(t.tst_preds.subtype$Drug)), na.rm = TRUE)`% are statistically significant out of the `r length(unique(t.tst_preds.subtype$Drug))`total drugs, which can be seen by this histogram of t.test results and Anova Results 
+As a note: 
+Based on t-tests, even with a bonferroni correction, most of the values are statistically signifcant. From this table `r sum(t.tst_preds.subtype$bonf_p.value < 0.001/length(unique(t.tst_preds.subtype$Drug)), na.rm = TRUE)`% are statistically significant at a corrected p-value of 0.001 out of the `r length(unique(t.tst_preds.subtype$Drug))`total drugs. This does indicte that we are getting an enrichment of likely false positive results, so the best thing to do would be to just consider the most significant results, essentially placing a much higher significant cutoff threshold. This should be investigated in future analysis. 
 
 ```{r, echo= FALSE}
 
 t.tst_preds.subtype %>% 
-  arrange(bonf_p.value) %>% 
-  mutate(log_p.correct = log10(bonf_p.value)) %>% 
   ggplot() +
-    geom_histogram(mapping = aes(x = log_p.correct)) +
-    geom_vline(xintercept = log10(0.05), color = "red") +
-    labs(title = "Histogram of T-test Results by Signifcance")
-
-aov_preds.subtype %>% 
-  arrange(bonf_p.value) %>% 
-  mutate(log_p.correct = log10(bonf_p.value)) %>% 
-  ggplot() +
-    geom_histogram(mapping = aes(x = log_p.correct)) +
-    geom_vline(xintercept = log10(0.05), color = "red") +
-    labs(title = "Histogram of Anova Results by Signifcance")
+    geom_histogram(mapping = aes(x = log10_p.correct)) +
+    geom_vline(xintercept = -log10(0.001), color = "red") +
+    labs(title = "Histogram of T-test Results by Signifcance", 
+         x = "Number of Drugs", 
+         y = "-log10(bonferroni-adjusted p-value")
 
 ```
+
+Now we can create a volcano plot with the t-test results and look for the most significant results: 
+
+```{r volcano plot of Estimate vs p-value}
+
+t.tst_preds.subtype %>% 
+  arrange(desc(log10_p.correct)) %>% 
+  dplyr::slice(1:5) %>% 
+  ggplot(mapping = aes(x = estimate, y = log10_p.correct, label = Drug)) + 
+    geom_point(data = t.tst_preds.subtype) +
+    geom_point(color = "red", size = 2.2) + 
+    geom_text_repel(nudge_y = 3) + 
+    labs(title = "Volcano Plot of TNBC vs RPBC T-Test Results \n P-values and Estimate Scores for All Drugs", 
+         y = "-log10(p.value)", 
+         x = "Mean Difference (Imputed Effect RPBC - TNBC)", 
+         caption = "Drugs More Effective in RPBC                                                                                                            Drugs More Effective in TNBC") + 
+    theme(plot.title = element_text(hjust = 0.5))
+    
+```
+
+
+### Postive controls and 
 
 
 Let us see if this recapitulates certain expected subtype specific response. 
@@ -223,6 +222,25 @@ TNBC_ISS_grapher <- function(drug){
       annotation_custom(grob_annot))
       
 }
+library(ggpubr)
+library(ggplot2)
+
+Sensitivity_grapher <- function(drug, comparison){
+print(
+  preds.subtype %>% 
+    filter(Drug == drug) %>% 
+    ggplot(aes(x = eval(parse(text = comparison)), y = PSS, fill = x)) + 
+      ggboxplot() +
+      labs(title = paste(drug, "'s Imputed Sensitivity in TCGA BRCA Cohort by TNBC Status", sep = ""),
+           y = "Imputed Sensitivity Score") +
+      theme(legend.position = "none",
+            plot.title = element_text(hjust = 0.5))+
+    stat_compare_means(method = "anova", label.y = 1)
+      
+)
+  
+}
+
 
 drugs.of.interest <- c("tamoxifen", "fulvestrant", "lapatinib", "MK-1775")
 
@@ -235,89 +253,141 @@ for(i in 1:length(drugs.of.interest)){
 
 ```
 
-```{r volcano plot of Estimate vs p-value}
-
-t.tst_preds.subtype <- t.tst_preds.subtype %>% 
-  mutate(log10_p.value = -log10(bonf_p.value)) 
-
-
-
-t.tst_preds.subtype %>% 
-  filter(Drug %in% "MK-1775") %>% 
-  ggplot(mapping = aes(x = estimate, y = log10_p.value, label = Drug)) + 
-    geom_point(data = t.tst_preds.subtype) +
-    geom_point(color = "red", size = 2.2) + 
-    geom_text_repel(nudge_y = 5, nudge_x = -0.25) + 
-    labs(title = "Volcano Plot of TNBC vs RPBC T-Test Results \n P-values and Estimate Scores for All Drugs", 
-         y = "-log10(p.value)", 
-         x = "Mean Differnce (RPBC - TNBC)", 
-         caption = "Drugs More Effective in RPBC                                                                                                            Drugs More Effective in TNBC") + 
-    theme(plot.title = element_text(hjust = 0.5))
-    
-
-
+```{r}
+  grob_annot <- grobTree(textGrob(paste("p-value =", 
+                                      format(t.tst_preds.subtype$bonf_p.value[t.tst_preds.subtype$Drug == drug], 
+                                             trim = T, digits = 4)), 
+                                x = 0.73, y = 0.95, hjust = 0, gp = gpar(fontface = "italic")))
+  print(preds.subtype %>% 
+    filter(Drug == drug) %>% 
+    ggplot(aes(x = TNBC_status, y = PSS, fill = TNBC_status)) + 
+      geom_boxplot() +
+      labs(title = paste(drug, "'s Imputed Sensitivity in TCGA BRCA Cohort by TNBC Status", sep = ""),
+           y = "Imputed Sensitivity Score") +
+      theme(legend.position = "none",
+            plot.title = element_text(hjust = 0.5))+
+      annotation_custom(grob_annot))
 ```
 
 
-```{r AOV Effect suze analysis and volcano plot}
 
-#perform the effect size analysis to get eta-squared values
-b_preds.subtype <- preds.subtype %>% 
-  group_by(Drug) %>% 
-  do(tidy(lsr::etaSquared(aov(.$PSS ~ .$PAM50)))) %>% 
-  ungroup()
+```{r test function}
 
-#we will also want to perform a Tukey HSD so that we can determine which group is the one that is most effective
-HSD_preds.subtype <- preds.subtype %>% 
-  group_by(Drug) %>% 
-  do(tidy(TukeyHSD(aov(.$PSS ~ .$PAM50)))) %>% 
-  ungroup()
-
-#now joining the two datasets and for each drug determining which is the sensitive group
-eta.sq_preds.subtype <- filter(b_preds.subtype) %>% 
-  left_join(x= . , y = HSD_preds.subtype) %>% 
-  group_by(Drug) %>% 
-  summarise(sensitive_group = if_else(sum(estimate[1:4] > 0) == 4, 
-                                      true = "basal", 
-                                      false = if_else(sum(c(estimate[1] < 0,estimate[5:7] > 0)) == 4, 
-                                                      true = "HER2", 
-                                                      false = if_else(sum(estimate[c(2:3, 5:6)] < 0) == 4, 
-                                                                      true = "luminal", 
-                                                                      false = "none"))),
-            eta.sq = eta.sq[1]) %>% 
-  ungroup() %>% 
-  left_join(., aov_preds.subtype) %>% 
-  mutate(log10_p.value = -log10(bonf_p.value)) 
-
-#print table (Supplemental table 1)
-eta.sq_preds.subtype %>% 
-  select(Drug, sensitive_group, eta.sq, bonf_p.value) %>% 
-  arrange(bonf_p.value)
+library(ggpubr)
+library(ggplot2)
 
 
-eta.sq_preds.subtype %>% 
-  select(Drug, sensitive_group, eta.sq, bonf_p.value) %>% 
-  group_by(sensitive_group) %>% 
-  arrange(bonf_p.value) %>% 
-  slice(1:5) 
+Sensitivity_grapher <- function(drug, comparison, group = "TNBC"){
+test <- combn(unique(eval(parse(text = paste("preds.subtype$", comparison)))), 2)
+test_list <- split(test, rep(1:ncol(test), each = nrow(test)))
+comp_list <- test_list[grepl(pattern = group, test_list)]
 
-# eta.sq_preds.subtype %>% 
-#   filter(Drug %in% "MK-1775") %>% 
-#   ggplot(mapping = aes(x = eta.sq, y = log10_p.value, label = Drug)) + 
-#     geom_point(data = eta.sq_preds.subtype) +
-#     geom_point(color = "red") + 
-#     geom_text_repel(nudge_y = 5, nudge_x = -0.25) + 
-#     labs(title = "Volcano Plot of TNBC vs RPBC ANOVA Results \n P-values and Eta Squared Values for All Drugs", 
-#          y = "-log10(FDR)", 
-#          x = "Eta Squared") + 
-#     theme(plot.title = element_text(hjust = 0.5))
-#     
-# eta.sq_preds.subtype %>% 
-#   ggplot(mapping = aes(x = log10_p.value, fill = sensitive_group)) + 
-#     geom_histogram() 
+box_labs <- preds.subtype %>% 
+    filter(Drug == drug) %>% 
+    count_(comparison) %>% 
+    .$n
+
+print(
+  preds.subtype %>% 
+    filter(Drug == drug) %>% 
+    arrange_(comparison) %>% 
+  ggboxplot(x = comparison, y = "PSS", fill = comparison) +
+      labs(title = paste(drug, "'s Imputed Sensitivity in TCGA BRCA Cohort by TNBC Status", sep = ""),
+           y = "Imputed Sensitivity Score", 
+           x = "BRCA Clinical Subtype") +
+      theme(legend.position = "none",
+            plot.title = element_text(hjust = 0.5))+
+    stat_compare_means(comparisons = comp_list) + 
+    grids() + 
+    stat_summary(geom = "text", label = paste("n =", box_labs), vjust = -0.5)
+      
+)
+  
+}
+
+
+Sensitivity_grapher(drug = "MK-1775", comparison = "Clin_Subtype")
+
+Sensitivity_grapher(drug = "lapatinib", comparison = "PAM50", group = "HER2")
+
+```
+
+```{r}
+plot_sensitivity2 <- function(.data, .drug = "MK-1775", .grp = "Clin_Subtype", .ref.group = "TNBC"){
+  
+  #filter
+  .data <- filter(.data, Drug == .drug) %>% arrange_(.grp)
+  # Compute p-values
+  comparison.formula <- paste0("PSS", "~", .grp) %>%
+    as.formula()
+  pvalues <- compare_means(
+    comparison.formula,  data = .data,
+    method = "t.test", ref.group = .ref.group
+    )
+  # P-value y coordinates
+  y.max <- .data %>% 
+    pull("PSS") %>% max(na.rm = TRUE) 
+  p.value.y.coord <- rep(y.max, nrow(pvalues))
+  
+  step.increase <- (1:nrow(pvalues))*(y.max/40)
+  p.value.y.coord <- p.value.y.coord + step.increase
+  
+  pvalues <- pvalues %>%
+    mutate(y.coord =  p.value.y.coord)
+  
+  box_labs <- preds.subtype %>% 
+    filter(Drug == drug) %>% 
+    count_(comparison) %>% 
+    .$n
+  
+  ggboxplot(.data, x = .grp, y = "PSS", fill = .grp)+
+    ggsignif::geom_signif(
+      data = pvalues, 
+      aes(xmin = group1, xmax = group2, annotations = p.adj, y_position = y.coord), 
+      manual= TRUE, tip_length = 0.03, size = 0.4) + 
+    grids() + 
+    labs(x = "Clinical Subtype", 
+         y = "Predicted Sensitivity Score", 
+         title = paste(.drug, "'s Imputed Sensitivity in TCGA BRCA Cohort by TNBC Status", sep = "")) + 
+    theme(legend.position = "none",
+            plot.title = element_text(hjust = 0.5)) + 
+    stat_summary(geom = "text", label = paste("n =", box_labs), vjust = -0.5)
+}
+
+
+# Graph
+plot_sensitivity2(.data = preds.subtype, .drug = "MK-1775" , .grp = "Clin_Subtype", .ref.group = "TNBC")
+
+plot_sensitivity2(.data = preds.subtype, .drug = "lapatinib" , .grp = "Clin_Subtype", .ref.group = "HER2+")
+```
 
 
 
+```{r}
+# test <- combn(unique(preds.subtype$Clin_Subtype), 2)
+# test_list <- split(test, rep(1:ncol(test), each = nrow(test)))
+# tnbc_list <- test_list[grepl(pattern = "TNBC", test_list)]
+# 
+# 
+# drug = "MK-1775"
+# comparison = "Clin_Subtype"
+# 
+# preds.subtype %>% 
+#     filter(Drug == drug) %>% 
+#     ggboxplot(x = comparison, y = "PSS", fill = comparison) +
+#       labs(title = paste(drug, "'s Imputed Sensitivity in TCGA BRCA Cohort by TNBC Status", sep = ""),
+#            y = "Imputed Sensitivity Score") +
+#       theme(legend.position = "none",
+#             plot.title = element_text(hjust = 0.5))+
+#       stat_compare_means(comparisons = tnbc_list)
+# 
+# 
+# 
+# buld_boxplot <- ggplot_build(boxplot_temp)
+# 
+# buld_boxplot$data[[2]]$annotation <- c(1:9) #Calculate p-values (TukeyHSD, etc. and put them here)
+# 
+# plot(ggplot_gtable(buld_boxplot))
 
 ```
 
