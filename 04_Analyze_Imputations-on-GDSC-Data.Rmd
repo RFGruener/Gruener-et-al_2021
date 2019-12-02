@@ -32,7 +32,7 @@ load("./DataOut/MK1775CTRP_in_GDSC.Rdata") #use the matrix_output_name from IMpu
 preds_fromCTRP <- as_tibble(t(CTRPDrugPredictions_mat), rownames = "CCLs") %>% 
   separate(CCLs, sep = "_", into = c("CCL", NA))
 GDSC_IC50s <- read_excel("./DataIn/GDSC/GDSC_IC50_July2019.xlsx") #read the drug response data downloaded earlier
-cell_lines <- read_excel("All Cell Line Infor.xlsx") #read in the Cell Line info from our review that was included in this repo, otherwise needs to be downloaded separately (see Download_TCGA... .Rmd file)
+cell_lines <- read_excel("./Included_Data/All Cell Line Info.xlsx") #read in the Cell Line info from our review that was included in this repo, otherwise needs to be downloaded separately (see Download_TCGA... .Rmd file)
 ccls <- cell_lines %>% select(`Harmonized Identifier`, `Study Cell Line Name`, `Cancer Statistics 2017 Sub-Category`)
 
 
