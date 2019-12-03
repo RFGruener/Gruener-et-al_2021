@@ -26,6 +26,7 @@ library(TCGAbiolinks)
 library(tidyverse)
 library(broom)
 library(readxl)
+library(magrittr)
 
 load("./DataOut/MK1775CTRP_in_GDSC.Rdata") #use the matrix_output_name from IMputing Drug Response in GDSC
 
@@ -70,24 +71,26 @@ theme_set(theme_bw()) #sets the theme for ggplot
 
 #Make graph of imputed and measured response to MK-1775 for all of GDSC
 Merge_preds_GDSC.IC50 %>% 
-  drop_na() %>% 
+  drop_na(LN_IC50) %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
     geom_smooth(method = "lm") + 
     ggpubr::stat_cor(method = "spearman") + 
-    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity in GDSC", 
-         x = "Predicted Sensitivty Score")
+    labs(title = "Correlation of Imputed and Measured MK1775 Sensitivity in GDSC", 
+         x = "Imputed Sensitivty Score",
+         y = "Measured ln(IC50) values from GDSC")
 
 #Make the same graph of imputed and measured response to MK-1775, but for only the breast cancer cell lines in GDSC
 Merge_preds_GDSC.IC50 %>% 
-  drop_na() %>% 
+  drop_na(LN_IC50) %>% 
   filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
     geom_smooth(method = "lm") + 
     ggpubr::stat_cor(method = "spearman") + 
-    labs(title = "Correlation of Predicted and Actual MK1775 Sensitivity in GDSC Breast CCLs",
-         x = "Predicted Sensitivty Score")
+    labs(title = "Correlation of Imputed and Actual MK1775 Sensitivity in GDSC Breast CCLs",
+         x = "Imputed Sensitivty Score", 
+         y = "Measured ln(IC50) values from GDSC")
 
 ```
 
@@ -118,8 +121,9 @@ Merge_preds_GDSC.IC50 %>%
     geom_point() + 
     geom_smooth(method = "lm") + 
     ggpubr::stat_cor(method = "spearman") + 
-    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Cell Lines Unique to GDSC", 
-         x = "Predicted Sensitivty Score")
+    labs(title = "Correlation of Imputed and Measured MK1775 Sensitivity \n in Cell Lines Unique to GDSC", 
+         x = "Imputed Sensitivty Score", 
+         y = "Measured ln(IC50) values from GDSC")
 
 #graph measured and predicted response in only BRCA GSDC cell lines that are unique to GDSC, n = 16
 Merge_preds_GDSC.IC50 %>% 
@@ -129,8 +133,9 @@ Merge_preds_GDSC.IC50 %>%
     geom_point() + 
     geom_smooth(method = "lm") + 
     ggpubr::stat_cor(method = "spearman") + 
-    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Breast Cancer Cell Lines Unique to GDSC", 
-         x = "Predicted Sensitivty Score")
+    labs(title = "Correlation of Imputed and Measured MK1775 Sensitivity \n in Breast Cancer Cell Lines Unique to GDSC", 
+         x = "Imputed Sensitivty Score", 
+         y = "Measured ln(IC50) values from GDSC")
 
 ```
 
@@ -143,15 +148,16 @@ We can follow this up by checking how well the cell lines that do overlap correl
 #use inner_join to find the CCLs that overlap with to GDSC, ie this time keeping ccls in GDSC that are also in CTRP
 overlapping_CCLs <- inner_join(GDSCtomerge, Ccls_CTRP, by = "Harmonized Identifier")
 
-#graph measured and predicted response in all GSDC cell lines that are unique to GDSC. Probably should have made a graphing function, but oh well. 
+#graph measured and predicted response in all GSDC cell lines that overlap between GDSC and CTRP to GDSC. Probably should have made a graphing function, but oh well. 
 Merge_preds_GDSC.IC50 %>% 
   semi_join(., overlapping_CCLs) %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
     geom_smooth(method = "lm") + 
     ggpubr::stat_cor(method = "spearman") + 
-    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Cell Lines Unique to GDSC", 
-         x = "Predicted Sensitivty Score")
+    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Cell Lines That Overlap to CTRP", 
+         x = "Predicted Sensitivty Score", 
+         y = "Measured ln(IC50) values from GDSC")
 
 #graph measured and predicted response in only BRCA GSDC cell lines that are unique to GDSC, n = 16
 Merge_preds_GDSC.IC50 %>% 
@@ -161,8 +167,36 @@ Merge_preds_GDSC.IC50 %>%
     geom_point() + 
     geom_smooth(method = "lm") + 
     ggpubr::stat_cor(method = "spearman") + 
-    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Breast Cancer Cell Lines Unique to GDSC", 
-         x = "Predicted Sensitivty Score")
+    labs(title = "Correlation of Predicted and Measured MK1775 Sensitivity \n in Breast Cancer Cell Lines That Overlap Between GDSC and CTRP", 
+         x = "Predicted Sensitivty Score", 
+         y = "Measured ln(IC50) values from GDSC")
+
+
+#not surprising, these graphs look essentially the same as the overall and unique GDSC/ISS graphs
+
+#but how do the 
+
+overlapping_CCLs %>% 
+  ggplot(aes(x = Avg_AUC, y = LN_IC50)) + 
+    geom_point() + 
+    geom_smooth(method = "lm") + 
+    ggpubr::stat_cor(method = "spearman") + 
+    labs(title = "Correlation of Mesured MK1775 Sensitivity from GDSC and CTRP", 
+         x = "Measured AUC Values from CTRP", 
+         y = "Measured ln(IC50) values from GDSC")
+
+
+overlapping_CCLs %>% 
+  filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
+  ggplot(aes(x = Avg_AUC, y = LN_IC50)) + 
+    geom_point() + 
+    geom_smooth(method = "lm") + 
+    ggpubr::stat_cor(method = "spearman") + 
+    labs(title = "Correlation of Mesured MK1775 Sensitivity from GDSC and CTRP in BRCA CCLs", 
+         x = "Measured AUC Values from CTRP", 
+         y = "Measured ln(IC50) values from GDSC")
+
+
 ```
 
 
@@ -178,7 +212,7 @@ Shown below is some of the information these data files contain.
 
 ```{r data_download, cache=TRUE}
 print("Breast cancer cell line info")
-(breast_cell_line_info <- read_csv(file = "Breast_CCL_Subtypes.csv"))
+(breast_cell_line_info <- read_csv(file = "./Included_Data/Breast_CCL_Subtypes.csv"))
 ```
 
 ##### Cleaning and Subsetting the data
@@ -272,5 +306,130 @@ GDSC_breast %>%
 As we can see, there are `r length(GDSC_t.test_results$FDR[GDSC_t.test_results$FDR < 0.05])` significant results in GDSC after multiple comparision correction. 
 
 Also, it is interesting to note that typically the direction is in favor of TNBC being *more sensitive*. In GDSC, even if we  use a FDR of 0.05 (note, FDR not p-value), there are `r sum(GDSC_t.test_results[GDSC_t.test_results$FDR < 0.05,]$more_sensitive == "TNBC")` drugs that are more effective on TNBC cells and only `r sum(GDSC_t.test_results[GDSC_t.test_results$FDR < 0.05,]$more_sensitive == "non-TNBC")` shown to be more effective on the RPBC cells. 
+
+
+
+
+
+```{r}
+CTRP_aucs %>%
+filter(cpd_name == "olaparib") %>% 
+left_join(., ccls, by = c("CCL_Name" = "Study Cell Line Name")) %>%
+distinct() %>% 
+drop_na(`Harmonized Identifier`) %>% 
+filter(`Cancer Statistics 2017 Sub-Category` == "Breast", 
+       apparent_ec50_umol < 150) %>% 
+  ggplot(aes(x = apparent_ec50_umol)) + 
+    geom_histogram() + 
+    geom_vline(xintercept = 21, color = "red")
+```
+
+```{r}
+CTRP_aucs %>%
+filter(cpd_name == "olaparib") %>% 
+left_join(., ccls, by = c("CCL_Name" = "Study Cell Line Name")) %>%
+distinct() %>% 
+drop_na(`Harmonized Identifier`) %>% 
+filter(`Cancer Statistics 2017 Sub-Category` == "Breast", 
+       apparent_ec50_umol < 135) %>% 
+mutate(rank = dense_rank(apparent_ec50_umol)) %>% 
+  ggplot(aes(x = rank, y = apparent_ec50_umol)) + 
+    geom_point() + 
+    geom_hline(yintercept = 21, color = "red")
+```
+
+
+
+```{r}
+CTRP_aucs %>%
+filter(cpd_name == "MK-1775") %>% 
+left_join(., ccls, by = c("CCL_Name" = "Study Cell Line Name")) %>%
+distinct() %>% 
+drop_na(`Harmonized Identifier`) %>% 
+filter(`Cancer Statistics 2017 Sub-Category` == "Breast", 
+       apparent_ec50_umol < 150) %>% 
+  ggplot(aes(x = apparent_ec50_umol)) + 
+    geom_histogram() + 
+    geom_vline(xintercept = 1.2, color = "red")
+```
+
+
+
+
+```{r}
+CTRP_aucs %>%
+filter(cpd_name == "MK-1775") %>% 
+left_join(., ccls, by = c("CCL_Name" = "Study Cell Line Name")) %>%
+distinct() %>% 
+drop_na(`Harmonized Identifier`) %>% 
+filter(`Cancer Statistics 2017 Sub-Category` == "Breast", 
+       apparent_ec50_umol < 135) %>% 
+mutate(rank = dense_rank(apparent_ec50_umol)) %>% 
+  ggplot(aes(x = rank, y = apparent_ec50_umol)) + 
+    geom_point() + 
+    geom_hline(yintercept = 1.6, color = "red")
+```
+
+
+```{r}
+CTRP_breast <- CTRP_aucs %>%
+  filter(cpd_name %in% c("MK-1775", "olaparib")) %>% 
+  left_join(., ccls, by = c("CCL_Name" = "Study Cell Line Name")) %>%
+  distinct() %>% 
+  drop_na(`Harmonized Identifier`) %>% 
+  filter(`Cancer Statistics 2017 Sub-Category` == "Breast", 
+         apparent_ec50_umol < 135) %>%  
+  select(CCL_Name, cpd_name, apparent_ec50_umol, Avg_AUC, `Harmonized Identifier`) %>%  #selecting relevant columns 
+  #need to join with breast cancer subtype data
+  left_join(., breast_cell_line_info, by = c("CCL_Name" = "Cell lines"))
+
+missing_subtype <- c("TNB", "H", "LA", "UN", "TNB", "UN", "TN", "LB", "TN", "H", "UN", "TNB") #"UN", unclassifiable, problematic cell lines with conflicting status claims in the literature
+names(missing_subtype) <- c("HDQP1", "JIMT1", "HMC18", "HCC1500", "HS578T", "HCC1419", "COLO824", "EVSAT", "MRKnu1", "OCUBM", "YMB1E", "MB157")
+
+CTRP_breast <- CTRP_breast %>% 
+  mutate(Subtype= if_else(is.na(Subtype), missing_subtype[CCL_Name], Subtype)) %>% 
+  mutate(TNBC = if_else(Subtype %in% c("TN", "TNA", "TNB"), "TNBC", "RPBC"))
+
+
+CTRP_breast %>% filter(cpd_name == "MK-1775") %>% 
+mutate(rank = dense_rank(apparent_ec50_umol)) %>% 
+  ggplot(aes(x = rank, y = apparent_ec50_umol, color = TNBC)) + 
+    geom_point() + 
+    geom_hline(yintercept = 1.6, color = "red") + 
+    labs(title = "MK-1775")
+
+CTRP_breast %>% filter(cpd_name == "olaparib") %>% 
+mutate(rank = dense_rank(apparent_ec50_umol)) %>% 
+  ggplot(aes(x = rank, y = apparent_ec50_umol, color = TNBC)) + 
+    geom_point() + 
+    geom_hline(yintercept = 21, color = "red") + 
+    labs(title = "Olaparib")
+
+```
+
+
+
+
+
+
+```{r}
+GDSC_breast %>%
+filter(DRUG_NAME == "MK-1775") %>% 
+distinct() %>% 
+drop_na(`Harmonized Identifier`) %>% 
+mutate(rank = dense_rank(LN_IC50)) %>% 
+  ggplot(aes(x = rank, y = LN_IC50)) + 
+    geom_point() + 
+    geom_hline(yintercept = log(1.6), color = "red")
+```
+
+
+
+
+
+
+
+
+
 
 
