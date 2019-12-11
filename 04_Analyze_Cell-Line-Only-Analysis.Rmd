@@ -1,0 +1,114 @@
+---
+title: "04_Analyze_Cell-Line-Only-Analysis"
+output: html_notebook
+---
+
+### Cell Line Only Analysis
+
+The breast cancer cell line info is from [a recent review](http://www.jcancer.org/v08p3131.htm) and shows the molecular classifications of the breast cancer cell lines. These files are also in the repo. 
+
+Shown below is some of the information these data files contain. 
+
+```{r data_download, cache=TRUE}
+print("Breast cancer cell line info")
+breast_cell_line_info <- read_csv(file = "./Included_Data/Breast_CCL_Subtypes.csv")
+```
+
+##### Cleaning and Subsetting the data
+
+We now need to combine the info files with the drug data, and subset to just the breast cancer cell lines
+
+```{r clean_subset}
+GDSC_breast <- GDSC_IC50s %>% 
+  select(CELL_LINE_NAME, DRUG_NAME, LN_IC50) %>%  #selecting relevant columns 
+  left_join(., ccls, by = c("CELL_LINE_NAME" = "Study Cell Line Name")) %>% 
+  distinct() %>% 
+  filter(`Cancer Statistics 2017 Sub-Category` == "Breast") %>% #filter to breast cancers only
+  #need to remove - from cell line names to make matches easier, chose to remove all punctuation as follows:
+  mutate(CCL_Name = gsub("[[:punct:]]", replacement = "", x = CELL_LINE_NAME)) %>% 
+  #need to join with breast cancer subtype data
+  left_join(., breast_cell_line_info, by = c("CCL_Name" = "Cell lines"))
+
+
+```
+
+Unfortunately, there is likely some missing subtype information still. Let's see:
+
+``` {r clean_subset_missing}
+# Unfortunately, there is likely some missing subtype information still. Let's see:
+
+missing_gdsc <- GDSC_breast %>% 
+    select(CCL_Name, Subtype) %>% 
+    filter(is.na(Subtype)) %>% 
+    unique()
+missing_gdsc$CCL_Name
+
+```
+
+Those 8 values will be manually curated. The top 10 rows of the final cleaned up data frame without any missing NA values and with the relevant columns selected is displayed below for GDSC and CTRP respectively: 
+
+```{r clean_subset_2}
+#There are 8 from GDSC, but the previous script found 12 when I also included CTRP, so I'm just using these 12 values 
+# these sites helped with the manual curation, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3127435/, https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5001206/
+
+missing_subtype <- c("TNB", "H", "LA", "UN", "TNB", "UN", "TN", "LB", "TN", "H", "UN", "TNB") #"UN", unclassifiable, problematic cell lines with conflicting status claims in the literature
+names(missing_subtype) <- c("HDQP1", "JIMT1", "HMC18", "HCC1500", "HS578T", "HCC1419", "COLO824", "EVSAT", "MRKnu1", "OCUBM", "YMB1E", "MB157")
+
+GDSC_breast <- GDSC_breast %>% 
+  mutate(Subtype= if_else(is.na(Subtype), missing_subtype[CCL_Name], Subtype)) %>% 
+  mutate(TNBC = ifelse(Subtype %in% c("TN", "TNA", "TNB"), "TNBC", "RPBC"))
+
+```
+
+
+With that, now we will get into the statistics. Below are the significant results for both datasets:
+
+```{r compare_results_statistics}
+GDSC_t.test_results <- GDSC_breast %>% 
+  group_by(DRUG_NAME) %>% 
+  do(tidy(t.test(LN_IC50 ~ TNBC, data = .))) %>% # thanks second answer here
+  # https://stackoverflow.com/questions/26244321/dplyr-summarise-multiple-columns-using-t-test
+  ##I now need to change names because it is unclear what the values are. 
+  #it goes in alphabetical order, so Estimate is the mean IC50 when TNBC=="no" minus the mean of TNBC=="yes" 
+  mutate(FDR = p.adjust(p.value, method = "fdr"), 
+         more_sensitive = if_else(estimate > 0, "TNBC", "non-TNBC")) #this summarizes 
+          ##the effect direction. The smaller the number, the more sensitive the cell was to this drug
+          ###So if the values are positive it means TNBC was more negative and thus more sensitive
+
+GDSC_t.test_results %>% arrange(FDR)
+
+#Let's Plot the Result
+
+GDSC_breast %>% 
+  filter(DRUG_NAME == "MK-1775") %>% 
+  left_join(., Merge_preds_GDSC.IC50, by = "Harmonized Identifier") %>% 
+  ggplot(aes(x = TNBC, y = `MK-1775`)) + 
+    geom_boxplot() + 
+    geom_jitter(width = 0.2, aes(color = TNBC)) +
+    labs(title = "GDSC Breast CCL Imputed AZD-1775 Response Stratified by TNBC Status" ,
+         y = "AZD-1775 Imputed Sensitivity Score",
+         x = NULL) + 
+    theme(legend.position = "none")
+
+GDSC_breast %>% 
+  filter(DRUG_NAME == "MK-1775") %>% 
+  ggplot(aes(x = TNBC, y = LN_IC50)) + 
+    geom_boxplot() + 
+    geom_jitter(width = 0.2, aes(color = TNBC)) +
+    labs(title = "GDSC Breast CCL Measured AZD-1775 Response Stratified by TNBC Status", 
+         y = "Measured IC50 to AZD-1775", 
+         x = NULL) + 
+  theme(legend.position = "none") + 
+  geom_hline(yintercept = 1.65)
+
+
+
+#There is one breast cancer cell line MDA-MB-175-VII or CVCL_1400 that wasn't imputed on apparently. Perhaps that one is missing RNA-Seq Data
+ 
+
+
+```
+
+As we can see, there are `r length(GDSC_t.test_results$FDR[GDSC_t.test_results$FDR < 0.05])` significant results in GDSC after multiple comparision correction. 
+
+Also, it is interesting to note that typically the direction is in favor of TNBC being *more sensitive*. In GDSC, even if we  use a p.value of 0.05 (note, FDR not p-value), there are `r sum(GDSC_t.test_results[GDSC_t.test_results$FDR < 0.05,]$more_sensitive == "TNBC")` drugs that are more effective on TNBC cells and only `r sum(GDSC_t.test_results[GDSC_t.test_results$FDR < 0.05,]$more_sensitive == "non-TNBC")` shown to be more effective on the RPBC cells. 
