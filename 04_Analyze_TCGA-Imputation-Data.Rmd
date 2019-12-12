@@ -1,5 +1,6 @@
 ---
 title: "Analyzing TCGA (patient) Imputation Data"
+author: "R. F. Gruener"
 output: html_notebook
 ---
 
