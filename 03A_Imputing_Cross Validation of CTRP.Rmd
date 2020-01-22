@@ -1,8 +1,3 @@
----
-title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug response in TCGA BRCA Tumors'
-output: html_notebook 
----
-
 ### Objectives
 
 Do the imputations
@@ -101,12 +96,12 @@ ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
 
 ```
 
-
-### Do the actual imputations 
+### Fourth, do cross-validation
 
 ```{r}
-#make a list of all possible drugs predictions
-CTRPDrugPredictions <- list()
+CTRP_LOOCV <- list()
+
+possibleDrugs <- "MK-1775"
 
 ########make a for loop for each drug seperate#################
 for(i in 1:length(possibleDrugs)) { 
@@ -114,27 +109,59 @@ for(i in 1:length(possibleDrugs)) {
   temp <- trainingPhenData[trainingPhenData$cpd_name == drug,] ## Makes temp matrix to extract the AUCs easier
   AUCs <- as.numeric(temp$Avg_AUC)
   names(AUCs) <- temp$CCL_Name
+  AUCs <- AUCs
   commonCellLines <- colnames(ExprData)[colnames(ExprData) %in% names(AUCs)]
   AUCsOrd <- AUCs[commonCellLines]
   trainDataOrd <- ExprData[, commonCellLines]
   trainDataOrd <- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
 
-  CTRPDrugPredictions[[i]] <- calcPhenotype(trainingExprData =  trainDataOrd, 
-                                trainingPtype = AUCsOrd, testExprData = testExprData, batchCorrect = batchCorrect, 
-                                powerTransformPhenotype = powerTransformPhenotype, removeLowVaryingGenes = removeLowVaryingGenes, 
-                                minNumSamples = minNumSamples, selection = selection, 
-                                printOutput = printOutput, removeLowVaringGenesFrom = removeLowVaringGenesFrom)
+  CTRP_LOOCV[[i]] <- predictionAccuracyByCv(trainingExprData =  trainDataOrd, trainingPtype = AUCsOrd, testExprData = testExprData, cvFold = -1)
+  
+  
 } #close for loop
 
-names(CTRPDrugPredictions) <- possibleDrugs
-CTRPDrugPredictions_mat <- do.call(rbind, CTRPDrugPredictions)
-save(CTRPDrugPredictions_mat, file= matrix_output_name)
+
 ```
 
 
+Note for the cross-validation. It takes up a lot of memory, especially if you don't subset the genes. There are 17,000 genes that overlap between training and the test data, but if you j ust use the training data there are 50,000+ genes which usually (on a base computer) will run into a protect() stack overflow error. For running the LOOCV with all the cell lines (for MK-1775, all 762 of them), you will likely run into an error of the vector being too large (6 GB) to store. 
 
 
+### A more efficient CV
+
+```{r}
+
+possibleDrugs <- unique(trainingPhenData$cpd_name)
+
+corP <- numeric()
+corSpear <- numeric()
+nAll <- numeric()
+
+########make a for loop for each drug seperate#################
+for(i in 1:length(possibleDrugs)) { 
+  drug <- possibleDrugs[i]
+  temp <- trainingPhenData[trainingPhenData$cpd_name == drug,] ## Makes temp matrix to extract the AUCs easier
+  AUCs <- as.numeric(temp$Avg_AUC)
+  names(AUCs) <- temp$CCL_Name
+  AUCs <- AUCs
+  commonCellLines <- colnames(ExprData)[colnames(ExprData) %in% names(AUCs)]
+  AUCsOrd <- AUCs[commonCellLines]
+  trainDataOrd <- ExprData[, commonCellLines]
+  trainDataOrd <- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
+
+  CTRP_LOOCV <- predictionAccuracyByCv(trainingExprData =  trainDataOrd, trainingPtype = AUCsOrd, testExprData = testExprData, cvFold = 10)
+  
+  # correlations on all tumors.
+    theCor <- cor.test(CTRP_LOOCV[[1]], CTRP_LOOCV[[2]])
+    corP[i] <- theCor$p.value
+    corSpear[i] <- theCor$estimate
+    nAll[i] <- length(CTRP_LOOCV[[1]])
+  
+  
+} #close for loop
+
+m <- cbind(nAll, corSpear, corP)
+colnames(m) <- c("N CCLs", "Spearman Correlation" , "Spearman P-value")
 
 
-
-
+```
