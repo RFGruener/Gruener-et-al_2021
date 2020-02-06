@@ -1752,78 +1752,42 @@ summary {
 <!-- rnb-text-begin -->
 <p>Now that we have a drug list, we can identify what pathways these drugs target. The list indicates that cell cycle is the most prominent pathway targeted.</p>
 <p>#need to load data from Analyze_TCGA-Imputation-Data as well as the currently non-existant Impute_All_TCGA_for_IDWAS.Rmd and IDWAS_Workflow.Rmd</p>
-<!-- rnb-text-end -->
-<!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuXG5kcnVnX3RhcmdldHMgPC0gcmVhZF9jc3YoXCJEcnVnX3RhcmdldHMocmV2aWV3KS5jc3ZcIikgIyBGcm9tIExpbmcgYW5kIEdydWVuZXIgZXQgYWxcblxudGFyZ2V0c19ldGEuc3EgPC0gZXRhLnNxX3ByZWRzLnN1YnR5cGUgJT4lIFxuICBmaWx0ZXIoZXRhLnNxID4gZXRhLnNxW0RydWcgPT0gXCJ0YW1veGlmZW5cIl0sIFxuICAgICAgICAgc2Vuc2l0aXZlX2dyb3VwID09IFwiYmFzYWxcIikgJT4lIFxuICBzZWxlY3QoRHJ1Zywgc2Vuc2l0aXZlX2dyb3VwLCBldGEuc3EsIGJvbmZfcC52YWx1ZSkgJT4lIFxuICBsZWZ0X2pvaW4oLiwgZHJ1Z190YXJnZXRzLCBieSA9IGMoXCJEcnVnXCIgPSBcIk5hbWUgaW4gRGF0YWJhc2VcIikpICU+JSBcbiAgc2VsZWN0KC1jKDc6OSkpICU+JSBcbiAgZGlzdGluY3QoKSBcblxuI1VzaW5nIHRoZSByZXZpZXcgaW5mb3JtYXRpb24gYXMgd2VsbCBzb21lIG1hbnVhbCBjdXJhdGlvbiwgdGhlc2UgYXJlIHRoZSBzaW1wbGlmaWVkIHBhdGh3YXlzIGZvciB0aGVzZSBjb21wb3VuZHMgXG5zaW1wbGlmaWVkX3BhdGhzIDwtIGMoXCJBbWlubyBBY2lkIE1ldGFib2xpc21cIiwgXCJDZWxsIEN5Y2xlXCIsIFwiQ2VsbCBDeWNsZVwiLCBcIlByb3RlaW4gU3RhYmlsaXR5IGFuZCBEZWdyYWRhdGlvblwiLCBcIkNlbGwgQ3ljbGVcIiwgXCJVbmtub3duXCIsIFwiQ2VsbCBDeWNsZVwiLCBcIlNwaGluZ29saXBpZCBNZXRhYm9saXNtXCIsIFwiQ2VsbCBDeWNsZVwiLCBcIkNlbGwgQ3ljbGVcIiwgXCJQcm90ZWluIFN0YWJpbGl0eSBhbmQgRGVncmFkYXRpb25cIiwgXCJTVEFUIFNpZ25hbGluZ1wiLCBcIkNlbGwgQ3ljbGVcIiwgXCJOb3RjaCBTaWduYWxpbmdcIiwgXCJQdXJpbmUgTWV0YWJvbGlzbVwiKVxuXG5uYW1lcyhzaW1wbGlmaWVkX3BhdGhzKSA8LSBjKFwiOTY4XCIsIFwiQVpENzc2MlwiLCBcIkJJLTI1MzZcIiwgXCJib3J0ZXpvbWliXCIsIFwiQlJELUszMDc0ODA2NlwiLCBcIkJSRC1LNjY0NTM4OTNcIiwgXCJCUkQ5ODc2Ok1LLTE3NzUgKDQ6MSBtb2wvbW9sKVwiLCBcImNlcmFuaWItMlwiLCBcIkdTSzQ2MTM2NFwiLCBcIk1LLTE3NzVcIiwgXCJNTE4yMjM4XCIsIFwiTlNDIDc0ODU5XCIsIFwiUEhBLTc5Mzg4N1wiLCBcInNlbWFnYWNlc3RhdFwiLCBcInRyaWF6b2xvdGhpYWRpYXppbmVcIilcblxudGFyZ2V0c19ldGEuc3EgPC0gdGFyZ2V0c19ldGEuc3EgJT4lIFxuICBtdXRhdGUoUGF0aHdheSA9IHNpbXBsaWZpZWRfcGF0aHNbbmFtZXMoc2ltcGxpZmllZF9wYXRocykgPT0gRHJ1Z10pICU+JSBcbiAgc2VsZWN0KDE6NCwgUGF0aHdheSlcblxudGFyZ2V0c19ldGEuc3FcblxuYGBgIn0= -->
-<pre class="r"><code>
-drug_targets &lt;- read_csv(&quot;Drug_targets(review).csv&quot;) # From Ling and Gruener et al
-
-targets_eta.sq &lt;- eta.sq_preds.subtype %&gt;% 
-  filter(eta.sq &gt; eta.sq[Drug == &quot;tamoxifen&quot;], 
-         sensitive_group == &quot;basal&quot;) %&gt;% 
-  select(Drug, sensitive_group, eta.sq, bonf_p.value) %&gt;% 
-  left_join(., drug_targets, by = c(&quot;Drug&quot; = &quot;Name in Database&quot;)) %&gt;% 
-  select(-c(7:9)) %&gt;% 
-  distinct() 
-
-#Using the review information as well some manual curation, these are the simplified pathways for these compounds 
-simplified_paths &lt;- c(&quot;Amino Acid Metabolism&quot;, &quot;Cell Cycle&quot;, &quot;Cell Cycle&quot;, &quot;Protein Stability and Degradation&quot;, &quot;Cell Cycle&quot;, &quot;Unknown&quot;, &quot;Cell Cycle&quot;, &quot;Sphingolipid Metabolism&quot;, &quot;Cell Cycle&quot;, &quot;Cell Cycle&quot;, &quot;Protein Stability and Degradation&quot;, &quot;STAT Signaling&quot;, &quot;Cell Cycle&quot;, &quot;Notch Signaling&quot;, &quot;Purine Metabolism&quot;)
-
-names(simplified_paths) &lt;- c(&quot;968&quot;, &quot;AZD7762&quot;, &quot;BI-2536&quot;, &quot;bortezomib&quot;, &quot;BRD-K30748066&quot;, &quot;BRD-K66453893&quot;, &quot;BRD9876:MK-1775 (4:1 mol/mol)&quot;, &quot;ceranib-2&quot;, &quot;GSK461364&quot;, &quot;MK-1775&quot;, &quot;MLN2238&quot;, &quot;NSC 74859&quot;, &quot;PHA-793887&quot;, &quot;semagacestat&quot;, &quot;triazolothiadiazine&quot;)
-
-targets_eta.sq &lt;- targets_eta.sq %&gt;% 
-  mutate(Pathway = simplified_paths[names(simplified_paths) == Drug]) %&gt;% 
-  select(1:4, Pathway)
-
-targets_eta.sq
-</code></pre>
-<!-- rnb-source-end -->
-<!-- rnb-chunk-end -->
-<!-- rnb-text-begin -->
 <p>We can go further and use the entire TCGA patient data and find associations between genetic features (i.e. non-synonymous mutations) and the patient’s Imputed Sensitivty Scores. If we graph the 9 genes with the most significant values, this is the result.</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuVENHQV9tdXRzX2lkd2EgPC0gcmVhZF9jc3YoXCJDVFJQX1RDR0FtdXRzX2FsbFJlc3VsdHNfY29udHJvbEZPUnRpc3N1ZS5jc3ZcIilcblxuYmlvbWFya2VyX2V0YS5zcSA8LSBUQ0dBX211dHNfaWR3YSAlPiUgXG4gIHNlcGFyYXRlKGNvbCA9IFgxLCBpbnRvID0gYyhcIkRydWdcIiwgXCJHZW5lXCIpLCBzZXAgPSBcIlxcXFwuXCIpICU+JSBcbiAgcmlnaHRfam9pbiguLCB0YXJnZXRzX2V0YS5zcSwgYnkgPSBcIkRydWdcIikgJT4lIFxuICBmaWx0ZXIoLiRHZW5lICVpbiUgdW5pcXVlKC4kR2VuZVsuJGBGRFIgKEJIIGNvcnJlY3RlZClgIDwgMC4wMDA1XSkpIFxuXG5iaW9tYXJrZXJfZXRhLnNxICU+JSBcbiAgZmlsdGVyKGBGRFIgKEJIIGNvcnJlY3RlZClgIDwgMC4wMSkgJT4lIFxuICBhcnJhbmdlKGBGRFIgKEJIIGNvcnJlY3RlZClgKVxuXG5iaW9tYXJrZXJfZXRhLnNxICU+JSBcbiAgZ2dwbG90KG1hcHBpbmcgPSBhZXMoeCA9IGBFZmZlY3QgU2l6ZSAoYmV0YSlgLCB5ID0gLWxvZyhgRkRSIChCSCBjb3JyZWN0ZWQpYCksIGxhYmVsID0gRHJ1ZykpICsgXG4gICAgZ2VvbV9wb2ludCgpICsgXG4gICAgZmFjZXRfd3JhcCh+R2VuZSwgc2NhbGVzID0gXCJmcmVlX3lcIikgK1xuICAgIGdlb21fdmxpbmUoeGludGVyY2VwdCA9IDAsIGNvbG9yID0gXCJibGFja1wiLCBsaW5ldHlwZSA9IFwiZGFzaGVkXCIpICsgXG4gICAgZ2VvbV9obGluZSh5aW50ZXJjZXB0ID0gLWxvZygwLjAxKSwgY29sb3IgPSBcInJlZFwiKSArIFxuICAgIGxhYnModGl0bGUgPSBcIlRvcCBNdXRhdGlvbi1JbXB1dGVkLURydWcgQXNzb2NpYXRpb25zIGluIFRDR0FcIixcbiAgICAgICAgIHkgPSBcIi1sb2coRkRSKVwiKSArIFxuICAgIHRoZW1lKHBsb3QudGl0bGUgPSBlbGVtZW50X3RleHQoaGp1c3QgPSAwLjUpKVxuXG5cbmBgYCJ9 -->
-<pre class="r"><code>TCGA_muts_idwa &lt;- read_csv(&quot;CTRP_TCGAmuts_allResults_controlFORtissue.csv&quot;)
-
-biomarker_eta.sq &lt;- TCGA_muts_idwa %&gt;% 
-  separate(col = X1, into = c(&quot;Drug&quot;, &quot;Gene&quot;), sep = &quot;\\.&quot;) %&gt;% 
-  right_join(., targets_eta.sq, by = &quot;Drug&quot;) %&gt;% 
-  filter(.$Gene %in% unique(.$Gene[.$`FDR (BH corrected)` &lt; 0.0005])) 
-
-biomarker_eta.sq %&gt;% 
-  filter(`FDR (BH corrected)` &lt; 0.01) %&gt;% 
-  arrange(`FDR (BH corrected)`)
-
-biomarker_eta.sq %&gt;% 
-  ggplot(mapping = aes(x = `Effect Size (beta)`, y = -log(`FDR (BH corrected)`), label = Drug)) + 
-    geom_point() + 
-    facet_wrap(~Gene, scales = &quot;free_y&quot;) +
-    geom_vline(xintercept = 0, color = &quot;black&quot;, linetype = &quot;dashed&quot;) + 
-    geom_hline(yintercept = -log(0.01), color = &quot;red&quot;) + 
-    labs(title = &quot;Top Mutation-Imputed-Drug Associations in TCGA&quot;,
-         y = &quot;-log(FDR)&quot;) + 
-    theme(plot.title = element_text(hjust = 0.5))
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuVENHQV9tdXRzX2lkd2EgPC0gcmVhZF9jc3YoXCJFOi9SZXNlYXJjaC9hKSBHZW5lcmFsLW1ldGhvZHNfSW1wdXRhdGlvbnNfQmlvbWFya2Vycy9iKSBJRFdBUyBhbmQgQmlvbWFya2Vycy9JRFdBUy90YWJsZXMvQ1RSUF9UQ0dBbXV0c19hbGxSZXN1bHRzX2NvbnRyb2xGT1J0aXNzdWUuY3N2XCIpXG5cbmBgYCJ9 -->
+<pre class="r"><code>TCGA_muts_idwa &lt;- read_csv(&quot;E:/Research/a) General-methods_Imputations_Biomarkers/b) IDWAS and Biomarkers/IDWAS/tables/CTRP_TCGAmuts_allResults_controlFORtissue.csv&quot;)
 </code></pre>
 <!-- rnb-source-end -->
+<!-- rnb-output-begin eyJkYXRhIjoiTWlzc2luZyBjb2x1bW4gbmFtZXMgZmlsbGVkIGluOiAnWDEnIFsxXVBhcnNlZCB3aXRoIGNvbHVtbiBzcGVjaWZpY2F0aW9uOlxuY29scyhcbiAgWDEgPSBcdTAwMWJbMzFtY29sX2NoYXJhY3RlcigpXHUwMDFiWzM5bSxcbiAgYFAtdmFsdWVgID0gXHUwMDFiWzMybWNvbF9kb3VibGUoKVx1MDAxYlszOW0sXG4gIGBGRFIgKEJIIGNvcnJlY3RlZClgID0gXHUwMDFiWzMybWNvbF9kb3VibGUoKVx1MDAxYlszOW0sXG4gIGBFZmZlY3QgU2l6ZSAoYmV0YSlgID0gXHUwMDFiWzMybWNvbF9kb3VibGUoKVx1MDAxYlszOW1cbilcbiJ9 -->
+<pre><code>Missing column names filled in: &#39;X1&#39; [1]Parsed with column specification:
+cols(
+  X1 = [31mcol_character()[39m,
+  `P-value` = [32mcol_double()[39m,
+  `FDR (BH corrected)` = [32mcol_double()[39m,
+  `Effect Size (beta)` = [32mcol_double()[39m
+)</code></pre>
+<!-- rnb-output-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <p>As we can see, even though all drugs are predicted to be more sensitive in TCGA TNBC patients, we can see that there are a variety of gene-drug associations. Some are highly specific, such as NFE2L2 with NSC-74859,</p>
 <p>We can look at the FDR corrected p-values for all the mutation-drug associations in the following table (each value in this table is an FDR corrected p-value for the respective gene and drug)</p>
 <!-- rnb-text-end -->
 <!-- rnb-chunk-begin -->
-<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxudG9wX2dlbmUuZHJ1Z19hc3NvY2lhdGlvbnNfdGFibGUgPC0gYmlvbWFya2VyX2V0YS5zcSAlPiUgXG4gIHNlbGVjdChEcnVnLCBHZW5lLCBgRkRSIChCSCBjb3JyZWN0ZWQpYCkgJT4lIFxuICBzcHJlYWQoa2V5ID0gR2VuZSwgdmFsdWUgPSBgRkRSIChCSCBjb3JyZWN0ZWQpYClcblxudG9wX2dlbmUuZHJ1Z19hc3NvY2lhdGlvbnNfdGFibGVcbmBgYCJ9 -->
-<pre class="r"><code>top_gene.drug_associations_table &lt;- biomarker_eta.sq %&gt;% 
+<!-- rnb-source-begin eyJkYXRhIjoiYGBgclxuYGBgclxudG9wX2dlbmUuZHJ1Z19hc3NvY2lhdGlvbnNfdGFibGUgPC0gYmlvbWFya2VyX2V0YS5zcSAlPiUgXG4gIHNlbGVjdChEcnVnLCBHZW5lLCBgRkRSIChCSCBjb3JyZWN0ZWQpYCkgJT4lIFxuICBzcHJlYWQoa2V5ID0gR2VuZSwgdmFsdWUgPSBgRkRSIChCSCBjb3JyZWN0ZWQpYClcblxudG9wX2dlbmUuZHJ1Z19hc3NvY2lhdGlvbnNfdGFibGVcbmBgYFxuYGBgIn0= -->
+<pre class="r"><code>```r
+top_gene.drug_associations_table &lt;- biomarker_eta.sq %&gt;% 
   select(Drug, Gene, `FDR (BH corrected)`) %&gt;% 
   spread(key = Gene, value = `FDR (BH corrected)`)
 
 top_gene.drug_associations_table</code></pre>
+<p>```</p>
 <!-- rnb-source-end -->
 <!-- rnb-chunk-end -->
 <!-- rnb-text-begin -->
 <!-- rnb-text-end -->
 
-<div id="rmd-source-code">LS0tDQp0aXRsZTogIkFuYWx5emUgSURXQVMgUmVzdWx0cyINCm91dHB1dDogaHRtbF9ub3RlYm9vaw0KLS0tDQoNCk5vdyB0aGF0IHdlIGhhdmUgYSBkcnVnIGxpc3QsIHdlIGNhbiBpZGVudGlmeSB3aGF0IHBhdGh3YXlzIHRoZXNlIGRydWdzIHRhcmdldC4gVGhlIGxpc3QgaW5kaWNhdGVzIHRoYXQgY2VsbCBjeWNsZSBpcyB0aGUgbW9zdCBwcm9taW5lbnQgcGF0aHdheSB0YXJnZXRlZC4gDQoNCiNuZWVkIHRvIGxvYWQgZGF0YSBmcm9tIEFuYWx5emVfVENHQS1JbXB1dGF0aW9uLURhdGEgYXMgd2VsbCBhcyB0aGUgY3VycmVudGx5IG5vbi1leGlzdGFudCBJbXB1dGVfQWxsX1RDR0FfZm9yX0lEV0FTLlJtZCBhbmQgSURXQVNfV29ya2Zsb3cuUm1kDQoNCg0KYGBge3IgZHJ1ZyB0YXJnZXRzfQ0KDQpkcnVnX3RhcmdldHMgPC0gcmVhZF9jc3YoIkRydWdfdGFyZ2V0cyhyZXZpZXcpLmNzdiIpICMgRnJvbSBMaW5nIGFuZCBHcnVlbmVyIGV0IGFsDQoNCnRhcmdldHNfZXRhLnNxIDwtIGV0YS5zcV9wcmVkcy5zdWJ0eXBlICU+JSANCiAgZmlsdGVyKGV0YS5zcSA+IGV0YS5zcVtEcnVnID09ICJ0YW1veGlmZW4iXSwgDQogICAgICAgICBzZW5zaXRpdmVfZ3JvdXAgPT0gImJhc2FsIikgJT4lIA0KICBzZWxlY3QoRHJ1Zywgc2Vuc2l0aXZlX2dyb3VwLCBldGEuc3EsIGJvbmZfcC52YWx1ZSkgJT4lIA0KICBsZWZ0X2pvaW4oLiwgZHJ1Z190YXJnZXRzLCBieSA9IGMoIkRydWciID0gIk5hbWUgaW4gRGF0YWJhc2UiKSkgJT4lIA0KICBzZWxlY3QoLWMoNzo5KSkgJT4lIA0KICBkaXN0aW5jdCgpIA0KDQojVXNpbmcgdGhlIHJldmlldyBpbmZvcm1hdGlvbiBhcyB3ZWxsIHNvbWUgbWFudWFsIGN1cmF0aW9uLCB0aGVzZSBhcmUgdGhlIHNpbXBsaWZpZWQgcGF0aHdheXMgZm9yIHRoZXNlIGNvbXBvdW5kcyANCnNpbXBsaWZpZWRfcGF0aHMgPC0gYygiQW1pbm8gQWNpZCBNZXRhYm9saXNtIiwgIkNlbGwgQ3ljbGUiLCAiQ2VsbCBDeWNsZSIsICJQcm90ZWluIFN0YWJpbGl0eSBhbmQgRGVncmFkYXRpb24iLCAiQ2VsbCBDeWNsZSIsICJVbmtub3duIiwgIkNlbGwgQ3ljbGUiLCAiU3BoaW5nb2xpcGlkIE1ldGFib2xpc20iLCAiQ2VsbCBDeWNsZSIsICJDZWxsIEN5Y2xlIiwgIlByb3RlaW4gU3RhYmlsaXR5IGFuZCBEZWdyYWRhdGlvbiIsICJTVEFUIFNpZ25hbGluZyIsICJDZWxsIEN5Y2xlIiwgIk5vdGNoIFNpZ25hbGluZyIsICJQdXJpbmUgTWV0YWJvbGlzbSIpDQoNCm5hbWVzKHNpbXBsaWZpZWRfcGF0aHMpIDwtIGMoIjk2OCIsICJBWkQ3NzYyIiwgIkJJLTI1MzYiLCAiYm9ydGV6b21pYiIsICJCUkQtSzMwNzQ4MDY2IiwgIkJSRC1LNjY0NTM4OTMiLCAiQlJEOTg3NjpNSy0xNzc1ICg0OjEgbW9sL21vbCkiLCAiY2VyYW5pYi0yIiwgIkdTSzQ2MTM2NCIsICJNSy0xNzc1IiwgIk1MTjIyMzgiLCAiTlNDIDc0ODU5IiwgIlBIQS03OTM4ODciLCAic2VtYWdhY2VzdGF0IiwgInRyaWF6b2xvdGhpYWRpYXppbmUiKQ0KDQp0YXJnZXRzX2V0YS5zcSA8LSB0YXJnZXRzX2V0YS5zcSAlPiUgDQogIG11dGF0ZShQYXRod2F5ID0gc2ltcGxpZmllZF9wYXRoc1tuYW1lcyhzaW1wbGlmaWVkX3BhdGhzKSA9PSBEcnVnXSkgJT4lIA0KICBzZWxlY3QoMTo0LCBQYXRod2F5KQ0KDQp0YXJnZXRzX2V0YS5zcQ0KDQpgYGANCg0KV2UgY2FuIGdvIGZ1cnRoZXIgYW5kIHVzZSB0aGUgZW50aXJlIFRDR0EgcGF0aWVudCBkYXRhIGFuZCBmaW5kIGFzc29jaWF0aW9ucyBiZXR3ZWVuIGdlbmV0aWMgZmVhdHVyZXMgKGkuZS4gbm9uLXN5bm9ueW1vdXMgbXV0YXRpb25zKSBhbmQgdGhlIHBhdGllbnQncyBJbXB1dGVkIFNlbnNpdGl2dHkgU2NvcmVzLiBJZiB3ZSBncmFwaCB0aGUgOSBnZW5lcyB3aXRoIHRoZSBtb3N0IHNpZ25pZmljYW50IHZhbHVlcywgdGhpcyBpcyB0aGUgcmVzdWx0LiAgDQoNCg0KYGBge3IgQmlvbWFya2VyIEFuYWx5c2lzfQ0KVENHQV9tdXRzX2lkd2EgPC0gcmVhZF9jc3YoIkNUUlBfVENHQW11dHNfYWxsUmVzdWx0c19jb250cm9sRk9SdGlzc3VlLmNzdiIpDQoNCmJpb21hcmtlcl9ldGEuc3EgPC0gVENHQV9tdXRzX2lkd2EgJT4lIA0KICBzZXBhcmF0ZShjb2wgPSBYMSwgaW50byA9IGMoIkRydWciLCAiR2VuZSIpLCBzZXAgPSAiXFwuIikgJT4lIA0KICByaWdodF9qb2luKC4sIHRhcmdldHNfZXRhLnNxLCBieSA9ICJEcnVnIikgJT4lIA0KICBmaWx0ZXIoLiRHZW5lICVpbiUgdW5pcXVlKC4kR2VuZVsuJGBGRFIgKEJIIGNvcnJlY3RlZClgIDwgMC4wMDA1XSkpIA0KDQpiaW9tYXJrZXJfZXRhLnNxICU+JSANCiAgZmlsdGVyKGBGRFIgKEJIIGNvcnJlY3RlZClgIDwgMC4wMSkgJT4lIA0KICBhcnJhbmdlKGBGRFIgKEJIIGNvcnJlY3RlZClgKQ0KDQpiaW9tYXJrZXJfZXRhLnNxICU+JSANCiAgZ2dwbG90KG1hcHBpbmcgPSBhZXMoeCA9IGBFZmZlY3QgU2l6ZSAoYmV0YSlgLCB5ID0gLWxvZyhgRkRSIChCSCBjb3JyZWN0ZWQpYCksIGxhYmVsID0gRHJ1ZykpICsgDQogICAgZ2VvbV9wb2ludCgpICsgDQogICAgZmFjZXRfd3JhcCh+R2VuZSwgc2NhbGVzID0gImZyZWVfeSIpICsNCiAgICBnZW9tX3ZsaW5lKHhpbnRlcmNlcHQgPSAwLCBjb2xvciA9ICJibGFjayIsIGxpbmV0eXBlID0gImRhc2hlZCIpICsgDQogICAgZ2VvbV9obGluZSh5aW50ZXJjZXB0ID0gLWxvZygwLjAxKSwgY29sb3IgPSAicmVkIikgKyANCiAgICBsYWJzKHRpdGxlID0gIlRvcCBNdXRhdGlvbi1JbXB1dGVkLURydWcgQXNzb2NpYXRpb25zIGluIFRDR0EiLA0KICAgICAgICAgeSA9ICItbG9nKEZEUikiKSArIA0KICAgIHRoZW1lKHBsb3QudGl0bGUgPSBlbGVtZW50X3RleHQoaGp1c3QgPSAwLjUpKQ0KDQoNCmBgYA0KDQpBcyB3ZSBjYW4gc2VlLCBldmVuIHRob3VnaCBhbGwgZHJ1Z3MgYXJlIHByZWRpY3RlZCB0byBiZSBtb3JlIHNlbnNpdGl2ZSBpbiBUQ0dBIFROQkMgcGF0aWVudHMsIHdlIGNhbiBzZWUgdGhhdCB0aGVyZSBhcmUgYSB2YXJpZXR5IG9mIGdlbmUtZHJ1ZyBhc3NvY2lhdGlvbnMuIFNvbWUgYXJlIGhpZ2hseSBzcGVjaWZpYywgc3VjaCBhcyBORkUyTDIgd2l0aCBOU0MtNzQ4NTksIA0KDQpXZSBjYW4gbG9vayBhdCB0aGUgRkRSIGNvcnJlY3RlZCBwLXZhbHVlcyBmb3IgYWxsIHRoZSBtdXRhdGlvbi1kcnVnIGFzc29jaWF0aW9ucyBpbiB0aGUgZm9sbG93aW5nIHRhYmxlIChlYWNoIHZhbHVlIGluIHRoaXMgdGFibGUgaXMgYW4gRkRSIGNvcnJlY3RlZCBwLXZhbHVlIGZvciB0aGUgcmVzcGVjdGl2ZSBnZW5lIGFuZCBkcnVnKQ0KDQoNCmBgYHtyfQ0KdG9wX2dlbmUuZHJ1Z19hc3NvY2lhdGlvbnNfdGFibGUgPC0gYmlvbWFya2VyX2V0YS5zcSAlPiUgDQogIHNlbGVjdChEcnVnLCBHZW5lLCBgRkRSIChCSCBjb3JyZWN0ZWQpYCkgJT4lIA0KICBzcHJlYWQoa2V5ID0gR2VuZSwgdmFsdWUgPSBgRkRSIChCSCBjb3JyZWN0ZWQpYCkNCg0KdG9wX2dlbmUuZHJ1Z19hc3NvY2lhdGlvbnNfdGFibGUNCmBgYA0KDQo=</div>
+<div id="rmd-source-code">LS0tDQp0aXRsZTogIkFuYWx5emUgSURXQVMgUmVzdWx0cyINCm91dHB1dDogaHRtbF9ub3RlYm9vaw0KLS0tDQoNCk5vdyB0aGF0IHdlIGhhdmUgYSBkcnVnIGxpc3QsIHdlIGNhbiBpZGVudGlmeSB3aGF0IHBhdGh3YXlzIHRoZXNlIGRydWdzIHRhcmdldC4gVGhlIGxpc3QgaW5kaWNhdGVzIHRoYXQgY2VsbCBjeWNsZSBpcyB0aGUgbW9zdCBwcm9taW5lbnQgcGF0aHdheSB0YXJnZXRlZC4gDQoNCiNuZWVkIHRvIGxvYWQgZGF0YSBmcm9tIEFuYWx5emVfVENHQS1JbXB1dGF0aW9uLURhdGEgYXMgd2VsbCBhcyB0aGUgY3VycmVudGx5IG5vbi1leGlzdGFudCBJbXB1dGVfQWxsX1RDR0FfZm9yX0lEV0FTLlJtZCBhbmQgSURXQVNfV29ya2Zsb3cuUm1kDQoNCg0KV2UgY2FuIGdvIGZ1cnRoZXIgYW5kIHVzZSB0aGUgZW50aXJlIFRDR0EgcGF0aWVudCBkYXRhIGFuZCBmaW5kIGFzc29jaWF0aW9ucyBiZXR3ZWVuIGdlbmV0aWMgZmVhdHVyZXMgKGkuZS4gbm9uLXN5bm9ueW1vdXMgbXV0YXRpb25zKSBhbmQgdGhlIHBhdGllbnQncyBJbXB1dGVkIFNlbnNpdGl2dHkgU2NvcmVzLiBJZiB3ZSBncmFwaCB0aGUgOSBnZW5lcyB3aXRoIHRoZSBtb3N0IHNpZ25pZmljYW50IHZhbHVlcywgdGhpcyBpcyB0aGUgcmVzdWx0LiAgDQoNCg0KYGBge3IgQmlvbWFya2VyIEFuYWx5c2lzfQ0KVENHQV9tdXRzX2lkd2EgPC0gcmVhZF9jc3YoIkU6L1Jlc2VhcmNoL2EpIEdlbmVyYWwtbWV0aG9kc19JbXB1dGF0aW9uc19CaW9tYXJrZXJzL2IpIElEV0FTIGFuZCBCaW9tYXJrZXJzL0lEV0FTL3RhYmxlcy9DVFJQX1RDR0FtdXRzX2FsbFJlc3VsdHNfY29udHJvbEZPUnRpc3N1ZS5jc3YiKQ0KDQpiaW9tYXJrZXJfZXRhLnNxIDwtIFRDR0FfbXV0c19pZHdhICU+JSANCiAgc2VwYXJhdGUoY29sID0gWDEsIGludG8gPSBjKCJEcnVnIiwgIkdlbmUiKSwgc2VwID0gIlxcLiIpICU+JSANCiAgcmlnaHRfam9pbiguLCB0YXJnZXRzX2V0YS5zcSwgYnkgPSAiRHJ1ZyIpICU+JSANCiAgZmlsdGVyKC4kR2VuZSAlaW4lIHVuaXF1ZSguJEdlbmVbLiRgRkRSIChCSCBjb3JyZWN0ZWQpYCA8IDAuMDAwNV0pKSANCg0KYmlvbWFya2VyX2V0YS5zcSAlPiUgDQogIGZpbHRlcihgRkRSIChCSCBjb3JyZWN0ZWQpYCA8IDAuMDEpICU+JSANCiAgYXJyYW5nZShgRkRSIChCSCBjb3JyZWN0ZWQpYCkNCg0KYmlvbWFya2VyX2V0YS5zcSAlPiUgDQogIGdncGxvdChtYXBwaW5nID0gYWVzKHggPSBgRWZmZWN0IFNpemUgKGJldGEpYCwgeSA9IC1sb2coYEZEUiAoQkggY29ycmVjdGVkKWApLCBsYWJlbCA9IERydWcpKSArIA0KICAgIGdlb21fcG9pbnQoKSArIA0KICAgIGZhY2V0X3dyYXAofkdlbmUsIHNjYWxlcyA9ICJmcmVlX3kiKSArDQogICAgZ2VvbV92bGluZSh4aW50ZXJjZXB0ID0gMCwgY29sb3IgPSAiYmxhY2siLCBsaW5ldHlwZSA9ICJkYXNoZWQiKSArIA0KICAgIGdlb21faGxpbmUoeWludGVyY2VwdCA9IC1sb2coMC4wMSksIGNvbG9yID0gInJlZCIpICsgDQogICAgbGFicyh0aXRsZSA9ICJUb3AgTXV0YXRpb24tSW1wdXRlZC1EcnVnIEFzc29jaWF0aW9ucyBpbiBUQ0dBIiwNCiAgICAgICAgIHkgPSAiLWxvZyhGRFIpIikgKyANCiAgICB0aGVtZShwbG90LnRpdGxlID0gZWxlbWVudF90ZXh0KGhqdXN0ID0gMC41KSkNCg0KDQpgYGANCg0KQXMgd2UgY2FuIHNlZSwgZXZlbiB0aG91Z2ggYWxsIGRydWdzIGFyZSBwcmVkaWN0ZWQgdG8gYmUgbW9yZSBzZW5zaXRpdmUgaW4gVENHQSBUTkJDIHBhdGllbnRzLCB3ZSBjYW4gc2VlIHRoYXQgdGhlcmUgYXJlIGEgdmFyaWV0eSBvZiBnZW5lLWRydWcgYXNzb2NpYXRpb25zLiBTb21lIGFyZSBoaWdobHkgc3BlY2lmaWMsIHN1Y2ggYXMgTkZFMkwyIHdpdGggTlNDLTc0ODU5LCANCg0KV2UgY2FuIGxvb2sgYXQgdGhlIEZEUiBjb3JyZWN0ZWQgcC12YWx1ZXMgZm9yIGFsbCB0aGUgbXV0YXRpb24tZHJ1ZyBhc3NvY2lhdGlvbnMgaW4gdGhlIGZvbGxvd2luZyB0YWJsZSAoZWFjaCB2YWx1ZSBpbiB0aGlzIHRhYmxlIGlzIGFuIEZEUiBjb3JyZWN0ZWQgcC12YWx1ZSBmb3IgdGhlIHJlc3BlY3RpdmUgZ2VuZSBhbmQgZHJ1ZykNCg0KDQpgYGB7cn0NCnRvcF9nZW5lLmRydWdfYXNzb2NpYXRpb25zX3RhYmxlIDwtIGJpb21hcmtlcl9ldGEuc3EgJT4lIA0KICBzZWxlY3QoRHJ1ZywgR2VuZSwgYEZEUiAoQkggY29ycmVjdGVkKWApICU+JSANCiAgc3ByZWFkKGtleSA9IEdlbmUsIHZhbHVlID0gYEZEUiAoQkggY29ycmVjdGVkKWApDQoNCnRvcF9nZW5lLmRydWdfYXNzb2NpYXRpb25zX3RhYmxlDQpgYGANCg0K</div>
 
 
 
@@ -1870,7 +1834,7 @@ $(document).ready(function () {
 <!-- code folding -->
 <script>
 $(document).ready(function () {
-  window.initializeSourceEmbed("Analyze_IDWAS.Rmd");
+  window.initializeSourceEmbed("04_Analyze_IDWAS.Rmd");
   window.initializeCodeFolding("show" === "show");
 });
 </script>

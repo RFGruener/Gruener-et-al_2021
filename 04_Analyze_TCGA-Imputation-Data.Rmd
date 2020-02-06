@@ -26,11 +26,12 @@ if (!requireNamespace(c("broom", "grid", "ggrepel", "lsr"), quietly = TRUE))
     install.packages("broom", "grid", "ggrepel", "lsr")
 
 library(TCGAbiolinks)
-library(tidyverse)
 library(broom)
 library(readxl)
 library(grid)
 library(ggrepel)
+library(tidyverse)
+
 
 theme_set(theme_bw())
 
@@ -62,7 +63,7 @@ BRCA_clinical <- clinical.BCRtab.all$clinical_patient_brca %>%
 
 TCGA_subs <- TCGAquery_subtype(tumor = "brca") #easily get TCGA PAM50 status this way
 
-BRCA_pam50 <- TCGA_subs %>% select(patient, PAM50 = BRCA_Subtype_PAM50) %>% filter(PAM50 != "NA")
+BRCA_pam50 <- TCGA_subs %>% dplyr::select(patient, PAM50 = BRCA_Subtype_PAM50) %>% filter(PAM50 != "NA")
 
 BRCA_clinical <- full_join(BRCA_clinical, BRCA_pam50, by = c("bcr_patient_barcode" = "patient")) 
 
@@ -205,9 +206,9 @@ drug_targets <- read_csv("./Included_Data/Drug_targets(review).csv") # From Ling
 
 targets_t.test <-  t.tst_preds.subtype %>%
   mutate(Drug = replace(Drug, Drug == "AZD-1775", "MK-1775")) %>% #replacng MK1775 for AZD1775 since it will be easier to match using "Name in Database" instead of all names
-  select(Drug, estimate, bonf_p.value, log10_p.correct) %>% 
+  dplyr::select(Drug, estimate, bonf_p.value, log10_p.correct) %>% 
   left_join(., drug_targets, by = c("Drug" = "Name in Database")) %>% 
-  select(-Database) %>% 
+  dplyr::select(-Database) %>% 
   distinct() %>% 
   mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) %>% 
   arrange(bonf_p.value)
@@ -259,7 +260,7 @@ targets_t.test <- targets_t.test %>% count(MOA, name = "Total_MOA_Count") %>% le
 #lets save the targets_t.test as a supplementary table
 
 targets_t.test %>% 
-  select(Drug, "Pubchem ID" = `Harmonized ID (Pubchem ID)`, "Effect Size" = estimate, "Bonferroni Adjusted p-value" = bonf_p.value, 
+  dplyr::select(Drug, "Pubchem ID" = `Harmonized ID (Pubchem ID)`, "Effect Size" = estimate, "Bonferroni Adjusted p-value" = bonf_p.value, 
          MOA, Targets, `Clinical Phase`, `Source for Clinical Information`, "N Drugs with same MOA" = Total_MOA_Count) %>% 
   write_csv(., path = "./DataOut/Supplementary Table 1.csv")
 
@@ -281,7 +282,7 @@ p_val_cutoff <- sort(abs(t.tst_preds.subtype$bonf_p.value), decreasing = F)[55]
 targets_t.test %>% filter(estimate > effect_cutoff,
          bonf_p.value < p_val_cutoff) %>% count(MOA, Total_MOA_Count, sort = T)
 
-
+write_csv(top_targets_t.tst, path = "./DataOut/Top_compounds.csv")
 
 ```
 

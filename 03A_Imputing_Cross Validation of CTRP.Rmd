@@ -25,28 +25,6 @@ needed_packages <- c("tidyverse", "qvalue", "affy", "GenomicFeatures", "org.Hs.e
                      "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
 lapply(needed_packages, require, character.only = TRUE)
 
-###################### Set Parameters ##########################
-# Set location and filename  for list/matrix R.data output (ctrp_list_output_name, ctrp_mat_output_name)
-
-dir.create("DataOut")
-#matrix_output_name <- "./DataOut/2015CTRP-Models_on_TCGA_BRCA.RData"
-
-# Finally, set parameters of pRRophetic's calcphenotype function 
-#batchCorrect options: "eb" for ComBat, "qn" for quantiles normalization, "standardize", or "none"
-batchCorrect <- "eb"
-#powerTransformPhenotype: does a power transformation to the phenotype data, recommended over log transformations by the literture 
-powerTransformPhenotype <- TRUE
-#removeLowVaryingGenes: percentage of low varying genes to remove, default is at 0.2 
-removeLowVaryingGenes <- 0.2
-#removeLowVaryingGenesFrom: where should it remove low varying genes from "homogenizeData" or "rawData"
-removeLowVaringGenesFrom <- "homogenizeData"
-#minNumSamples: minimum number of training samples, set to 30, but this shouldn't be an issue since the there are many samples 
-minNumSamples = 30
-#selection: how to deal with duplicated gene IDs, -1 for ask user, 1 for summarize by mean, 2 for disregard duplicates
-selection <- 1
-#printoutput: should it print outputs, default is TRUE
-printOutput = TRUE
-
 
 ```
 
@@ -98,31 +76,6 @@ ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
 
 ### Fourth, do cross-validation
 
-```{r}
-CTRP_LOOCV <- list()
-
-possibleDrugs <- "MK-1775"
-
-########make a for loop for each drug seperate#################
-for(i in 1:length(possibleDrugs)) { 
-  drug <- possibleDrugs[i]
-  temp <- trainingPhenData[trainingPhenData$cpd_name == drug,] ## Makes temp matrix to extract the AUCs easier
-  AUCs <- as.numeric(temp$Avg_AUC)
-  names(AUCs) <- temp$CCL_Name
-  AUCs <- AUCs
-  commonCellLines <- colnames(ExprData)[colnames(ExprData) %in% names(AUCs)]
-  AUCsOrd <- AUCs[commonCellLines]
-  trainDataOrd <- ExprData[, commonCellLines]
-  trainDataOrd <- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
-
-  CTRP_LOOCV[[i]] <- predictionAccuracyByCv(trainingExprData =  trainDataOrd, trainingPtype = AUCsOrd, testExprData = testExprData, cvFold = -1)
-  
-  
-} #close for loop
-
-
-```
-
 
 Note for the cross-validation. It takes up a lot of memory, especially if you don't subset the genes. There are 17,000 genes that overlap between training and the test data, but if you j ust use the training data there are 50,000+ genes which usually (on a base computer) will run into a protect() stack overflow error. For running the LOOCV with all the cell lines (for MK-1775, all 762 of them), you will likely run into an error of the vector being too large (6 GB) to store. 
 
@@ -131,7 +84,11 @@ Note for the cross-validation. It takes up a lot of memory, especially if you do
 
 ```{r}
 
-possibleDrugs <- unique(trainingPhenData$cpd_name)
+#free up some memory 
+rm(list = keep(trainingPhenData, ExprData, testExprData))
+
+
+possibleDrugs <- "MK-1775"
 
 corP <- numeric()
 corSpear <- numeric()
@@ -149,7 +106,7 @@ for(i in 1:length(possibleDrugs)) {
   trainDataOrd <- ExprData[, commonCellLines]
   trainDataOrd <- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
 
-  CTRP_LOOCV <- predictionAccuracyByCv(trainingExprData =  trainDataOrd, trainingPtype = AUCsOrd, testExprData = testExprData, cvFold = 10)
+  CTRP_LOOCV <- predictionAccuracyByCv(trainingExprData =  trainDataOrd, trainingPtype = AUCsOrd, testExprData = testExprData, cvFold = -1)
   
   # correlations on all tumors.
     theCor <- cor.test(CTRP_LOOCV[[1]], CTRP_LOOCV[[2]])

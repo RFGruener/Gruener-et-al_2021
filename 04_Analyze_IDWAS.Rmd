@@ -8,36 +8,11 @@ Now that we have a drug list, we can identify what pathways these drugs target. 
 #need to load data from Analyze_TCGA-Imputation-Data as well as the currently non-existant Impute_All_TCGA_for_IDWAS.Rmd and IDWAS_Workflow.Rmd
 
 
-```{r drug targets}
-
-drug_targets <- read_csv("Drug_targets(review).csv") # From Ling and Gruener et al
-
-targets_eta.sq <- eta.sq_preds.subtype %>% 
-  filter(eta.sq > eta.sq[Drug == "tamoxifen"], 
-         sensitive_group == "basal") %>% 
-  select(Drug, sensitive_group, eta.sq, bonf_p.value) %>% 
-  left_join(., drug_targets, by = c("Drug" = "Name in Database")) %>% 
-  select(-c(7:9)) %>% 
-  distinct() 
-
-#Using the review information as well some manual curation, these are the simplified pathways for these compounds 
-simplified_paths <- c("Amino Acid Metabolism", "Cell Cycle", "Cell Cycle", "Protein Stability and Degradation", "Cell Cycle", "Unknown", "Cell Cycle", "Sphingolipid Metabolism", "Cell Cycle", "Cell Cycle", "Protein Stability and Degradation", "STAT Signaling", "Cell Cycle", "Notch Signaling", "Purine Metabolism")
-
-names(simplified_paths) <- c("968", "AZD7762", "BI-2536", "bortezomib", "BRD-K30748066", "BRD-K66453893", "BRD9876:MK-1775 (4:1 mol/mol)", "ceranib-2", "GSK461364", "MK-1775", "MLN2238", "NSC 74859", "PHA-793887", "semagacestat", "triazolothiadiazine")
-
-targets_eta.sq <- targets_eta.sq %>% 
-  mutate(Pathway = simplified_paths[names(simplified_paths) == Drug]) %>% 
-  select(1:4, Pathway)
-
-targets_eta.sq
-
-```
-
 We can go further and use the entire TCGA patient data and find associations between genetic features (i.e. non-synonymous mutations) and the patient's Imputed Sensitivty Scores. If we graph the 9 genes with the most significant values, this is the result.  
 
 
 ```{r Biomarker Analysis}
-TCGA_muts_idwa <- read_csv("CTRP_TCGAmuts_allResults_controlFORtissue.csv")
+TCGA_muts_idwa <- read_csv("E:/Research/a) General-methods_Imputations_Biomarkers/b) IDWAS and Biomarkers/IDWAS/tables/CTRP_TCGAmuts_allResults_controlFORtissue.csv")
 
 biomarker_eta.sq <- TCGA_muts_idwa %>% 
   separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>% 

@@ -32,7 +32,7 @@ lapply(needed_packages, require, character.only = TRUE)
 # Set location and filename  for list/matrix R.data output 
 dir.create("DataOut")
 #list_output_name <- "./DataOut/CTRPbreastcancerPREDS.RData" #we won't be using the list, but you can save it if you so choose 
-matrix_output_name <- "./DataOut/MK1775CTRP_in_GDSC.Rdata"
+matrix_output_name <- "./DataOut/TopTNBC_CTRP_in_GDSC.Rdata"
 
 # Finally, set parameters of pRRophetic's calcphenotype function 
 #batchCorrect options: "eb" for ComBat, "qn" for quantiles normalization, "standardize", or "none"
@@ -94,9 +94,17 @@ CTRPv2_AUC <- read.delim("./DataIn/CTRPv2/CTRPv2_AUC_clean.txt", sep = "\t", str
 #Altering cell line names that start with a number to start with an X to match rownames of expression data
 start.with.number <- grep("^[[:digit:]]", CTRPv2_AUC$CCL_Name)
 CTRPv2_AUC$CCL_Name[start.with.number] <- paste("X", CTRPv2_AUC$CCL_Name[start.with.number], sep = "")
-
 trainingPhenData <- CTRPv2_AUC
-possibleDrugs <- "MK-1775" #unique(trainingPhenData$cpd_name) #here, I only impute for AZD-1775 because it is the only one I present in the paper. To get the values on all 545 drugs in CTRP, use the unique(trainingPhenData$cpd_name) instead
+
+top_TNBC_drugs <- read_csv("./DataOut/Top_compounds.csv") 
+drug_targets <- read_csv("./Included_Data/Drug_targets(review).csv") %>% 
+  filter(Database == "GDSC") %>% 
+  dplyr::select(`Harmonized Name`, GDSC_name = `Name in Database`) 
+
+TNBC_drugs_in_GDSC <- inner_join(top_TNBC_drugs, drug_targets)
+
+
+possibleDrugs <- c("MK-1775", TNBC_drugs_in_GDSC$Drug) #here, I only impute for AZD-1775 because it is the only one I present in the paper. To get the values on all 545 drugs in CTRP, use the unique(trainingPhenData$cpd_name) instead
 
 #Load Training Expression data, convert it to a matrix
 CTRPv2_RNAseq_TPM <- read.delim("./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt",  sep = "\t", stringsAsFactors = F)
@@ -107,7 +115,11 @@ convert.to.matrix <- function(df){
   }
 ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
 #make a list of all possible drugs predictions
+
+keep(ExprData, possibleDrugs, trainingPhenData, testExprData, batchCorrect, powerTransformPhenotype, 
+     removeLowVaringGenesFrom, minNumSamples, selection, printOutput, removeLowVaryingGenes, sure = TRUE)
 CTRPDrugPredictions <- list()
+
 
 ########make a for loop for each drug seperate#################
 for(i in 1:length(possibleDrugs)) { 

@@ -93,8 +93,6 @@ Merge_preds_GDSC.IC50 %>%
          y = "Measured ln(IC50) values from GDSC")
 
 
-
-
 ```
 
 As we can see, they correlate very strongly. However, even though the CTRP and GDSC datasets are completely independent, some of these cell lines overlap between the datasets and therefore appear in both the training and testing datasets. Thus, it may be important to look at correlation between cell lines that are unique to GDSC, that is those that are truly independent, to make sure that the same trend holds.  
