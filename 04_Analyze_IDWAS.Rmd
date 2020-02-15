@@ -12,8 +12,38 @@ We can go further and use the entire TCGA patient data and find associations bet
 
 
 ```{r Biomarker Analysis}
-TCGA_muts_idwa <- read_csv("E:/Research/a) General-methods_Imputations_Biomarkers/b) IDWAS and Biomarkers/IDWAS/tables/CTRP_TCGAmuts_allResults_controlFORtissue.csv")
 
+library(tidyverse)
+theme_set(theme_bw())
+TCGA_BRCA_muts_idwa <- read_csv("E:/Research/a) General-methods_Imputations_Biomarkers/b) IDWAS and Biomarkers/IDWAS/tables/CTRPResults_BRCAonly.csv")
+
+IDWAS_results <-  TCGA_BRCA_muts_idwa %>% 
+  separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>% 
+  rename(FDR = `FDR (BH corrected)`) %>% 
+  mutate(logFDR = -log10(FDR))
+
+IDWAS_results
+```
+
+```{r Drug Based Analysis}
+azd_p53<- IDWAS_results %>% 
+  filter(Drug == "MK-1775") %>% 
+  ggplot(aes(x = logFDR)) + 
+    geom_histogram(bins = 20, fill = "light blue", color = "black") +
+    labs(y = "Number of Associations", 
+         x = "Significance (-log10 FDR)") +
+    xlim(NA, 48) +
+  geom_vline(xintercept = 45.9, color = "red") +
+  annotate(geom = "text", x = 34, y = 200, parse = T, 
+           label = as.character(expression(atop("p53-AZD1775 Association", "(red line, FDR = 1.2x10"^{-46}*")"))))
+
+azd_p53
+
+
+```
+
+
+```{r Gene-Based Analysis}
 biomarker_eta.sq <- TCGA_muts_idwa %>% 
   separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>% 
   right_join(., targets_eta.sq, by = "Drug") %>% 
@@ -34,18 +64,14 @@ biomarker_eta.sq %>%
     theme(plot.title = element_text(hjust = 0.5))
 
 
-```
-
-As we can see, even though all drugs are predicted to be more sensitive in TCGA TNBC patients, we can see that there are a variety of gene-drug associations. Some are highly specific, such as NFE2L2 with NSC-74859, 
-
-We can look at the FDR corrected p-values for all the mutation-drug associations in the following table (each value in this table is an FDR corrected p-value for the respective gene and drug)
-
-
-```{r}
 top_gene.drug_associations_table <- biomarker_eta.sq %>% 
   select(Drug, Gene, `FDR (BH corrected)`) %>% 
   spread(key = Gene, value = `FDR (BH corrected)`)
 
 top_gene.drug_associations_table
 ```
+
+As we can see, even though all drugs are predicted to be more sensitive in TCGA TNBC patients, we can see that there are a variety of gene-drug associations. Some are highly specific, such as NFE2L2 with NSC-74859, 
+
+We can look at the FDR corrected p-values for all the mutation-drug associations in the following table (each value in this table is an FDR corrected p-value for the respective gene and drug)
 
