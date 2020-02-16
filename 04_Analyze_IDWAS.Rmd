@@ -39,39 +39,123 @@ azd_p53<- IDWAS_results %>%
 
 azd_p53
 
+IDWAS_results %>% 
+  filter(Drug == "MK-1775", 
+         FDR < 0.01)
+
+IDWAS_results %>% 
+  filter(FDR < 0.0001) %>% 
+  count(Gene) %>% arrange(desc(n))
 
 ```
 
 
 ```{r Gene-Based Analysis}
-biomarker_eta.sq <- TCGA_muts_idwa %>% 
-  separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>% 
-  right_join(., targets_eta.sq, by = "Drug") %>% 
-  filter(.$Gene %in% unique(.$Gene[.$`FDR (BH corrected)` < 0.0005])) 
 
-biomarker_eta.sq %>% 
-  filter(`FDR (BH corrected)` < 0.01) %>% 
-  arrange(`FDR (BH corrected)`)
+TCGA_muts_idwa <- read_csv("E:/Research/a) General-methods_Imputations_Biomarkers/b) IDWAS and Biomarkers/IDWAS/tables/CTRP_TCGAmuts_allResults_controlFORtissue.csv")
 
-biomarker_eta.sq %>% 
-  ggplot(mapping = aes(x = `Effect Size (beta)`, y = -log(`FDR (BH corrected)`), label = Drug)) + 
+
+table_top_drugs <- read_csv("./DataOut/Table1_draft.csv")
+
+top_drugs <- table_top_drugs %>% 
+  separate_rows(drugs, sep = ", ") %>% 
+  rename(Drug = drugs)
+
+genes_top <- TCGA_muts_idwa %>% 
+  separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>%
+  rename(FDR = `FDR (BH corrected)`) %>% 
+  mutate(logFDR = -log10(FDR)) %>% 
+  mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) %>% 
+  right_join(., top_drugs, by = "Drug")
+
+graph_FDR_cutoff <- genes_top %>% 
+  drop_na(Gene) %>% 
+  filter(.$Gene %in% unique(.$Gene[order(.$FDR)])[1:12]) %>% #written this way, gets the top 12 (arbitrary, just for aesthetics) unique genes based on FDR value, then filters the dataset to keep these genes for all the drugs
+  mutate(Gene = factor(x = Gene, levels = unique(.$Gene[order(.$FDR)])[1:12]))
+
+graph_FDR_cutoff %>% 
+  mutate(color = if_else(Drug == "AZD-1775", "AZD-1775",
+                         if_else(MOA %in% c("CDK inhibitor", "CHK inhibitor", "PLK inhibitor"), "Cell Cycle", "Other"))) %>% 
+  ggplot(mapping = aes(x = `Effect Size (beta)`, y = logFDR, color = color)) + 
     geom_point() + 
     facet_wrap(~Gene, scales = "free_y") +
     geom_vline(xintercept = 0, color = "black", linetype = "dashed") + 
-    geom_hline(yintercept = -log(0.01), color = "red") + 
+    geom_hline(yintercept = -log10(0.01), color = "red") + 
     labs(title = "Top Mutation-Imputed-Drug Associations in TCGA",
          y = "-log(FDR)") + 
-    theme(plot.title = element_text(hjust = 0.5))
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_color_manual(values = c("red", "light blue2", "black"))
+
+sup3a <- graph_FDR_cutoff %>% 
+  mutate(`Mechanism of Action` = if_else(Drug == "AZD-1775", " Wee1 Inhibition",
+                         if_else(MOA %in% c("CDK inhibitor", "CHK inhibitor", "PLK inhibitor"), "Cell Cycle", "Other"))) %>% 
+  ggplot(mapping = aes(x = `Effect Size (beta)`, y = logFDR, color = `Mechanism of Action`)) + 
+    geom_point() + 
+    facet_wrap(~Gene, scales = "free_y") +
+    geom_vline(xintercept = 0, color = "black", linetype = "dashed") + 
+    geom_hline(yintercept = -log10(0.01), color = "red") + 
+    labs(y = "-log(FDR)") + 
+    scale_color_manual(values = c("red", "#2471A3", "black")) + 
+    theme(legend.position = "top")
 
 
-top_gene.drug_associations_table <- biomarker_eta.sq %>% 
-  select(Drug, Gene, `FDR (BH corrected)`) %>% 
-  spread(key = Gene, value = `FDR (BH corrected)`)
-
-top_gene.drug_associations_table
 ```
 
-As we can see, even though all drugs are predicted to be more sensitive in TCGA TNBC patients, we can see that there are a variety of gene-drug associations. Some are highly specific, such as NFE2L2 with NSC-74859, 
 
-We can look at the FDR corrected p-values for all the mutation-drug associations in the following table (each value in this table is an FDR corrected p-value for the respective gene and drug)
+```{r}
+graph_FDR_cutoff %>% filter(logFDR > 5) %>% arrange(FDR)
+
+```
+
+
+
+
+##### Supplmental Code
+
+```{r Gene-based only BRCA}
+
+brca_genes_top <- IDWAS_results %>% 
+  mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) %>% 
+  right_join(., top_drugs, by = "Drug")
+
+brca_graph_FDR_cutoff <- brca_genes_top %>% 
+  drop_na(Gene) %>% 
+  filter(.$Gene %in% unique(.$Gene[order(.$FDR)])[1:12]) %>%  #written this way, gets the top 12 (arbitrary, just for aesthetics) unique genes based on FDR value, then filters the dataset to keep these genes for all the drugs
+  mutate(Gene = factor(x = Gene, levels = unique(.$Gene[order(.$FDR)])[1:12]))
+
+brca_graph_FDR_cutoff %>% 
+  mutate(color = if_else(Drug == "AZD-1775", "AZD-1775",
+                         if_else(MOA %in% c("CDK inhibitor", "CHK inhibitor", "PLK inhibitor"), "Cell Cycle", "Other"))) %>% 
+  ggplot(mapping = aes(x = `Effect Size (beta)`, y = logFDR, color = color)) + 
+    geom_point() + 
+    facet_wrap(~Gene, scales = "free_y") +
+    geom_vline(xintercept = 0, color = "black", linetype = "dashed") + 
+    geom_hline(yintercept = -log10(0.01), color = "red") + 
+    labs(title = "Top Mutation-Imputed-Drug Associations in TCGA BRCA",
+         y = "-log(FDR)") + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_color_manual(values = c("red", "light blue2", "black"))
+
+```
+
+
+
+
+```{r}
+all_tcga_azd1775 <- TCGA_muts_idwa %>% 
+  separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>%
+  rename(FDR = `FDR (BH corrected)`) %>% 
+  mutate(logFDR = -log10(FDR)) %>% 
+  filter(Drug == "MK-1775")
+
+all_tcga_azd1775
+
+all_tcga_azd1775 %>% 
+  ggplot(aes(x = logFDR)) + 
+    geom_histogram(bins = 20, fill = "light blue", color = "black") +
+    labs(y = "Number of Associations", 
+         x = "Significance (-log10 FDR)")
+
+```
+
 
