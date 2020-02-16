@@ -70,7 +70,7 @@ To begin, after merging the Imputed and measured datasets, make a graph of imput
 theme_set(theme_bw()) #sets the theme for ggplot
 
 #Make graph of imputed and measured response to MK-1775 for all of GDSC
-Merge_preds_GDSC.IC50 %>% 
+sfig4a <-Merge_preds_GDSC.IC50 %>% 
   drop_na(LN_IC50) %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
@@ -80,8 +80,10 @@ Merge_preds_GDSC.IC50 %>%
          x = "Imputed Sensitivty Score",
          y = "Measured ln(IC50) values from GDSC")
 
+sfig4a <- sfig4a + labs(title = NULL)
+
 #Make the same graph of imputed and measured response to MK-1775, but for only the breast cancer cell lines in GDSC
-Merge_preds_GDSC.IC50 %>% 
+sfig4b <- Merge_preds_GDSC.IC50 %>% 
   drop_na(LN_IC50) %>% 
   filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
@@ -92,6 +94,7 @@ Merge_preds_GDSC.IC50 %>%
          x = "Imputed Sensitivty Score", 
          y = "Measured ln(IC50) values from GDSC")
 
+sfig4b <- sfig4b + labs(title = NULL)
 
 ```
 
@@ -116,7 +119,7 @@ CTRP_aucs %>% filter(cpd_name == "MK-1775") %$% length(.$cpd_name) ==
 non_modeled_CCLs <- anti_join(GDSCtomerge, Ccls_CTRP, by = "Harmonized Identifier")
 
 #graph measured and Imputed response in all GSDC cell lines that are unique to GDSC. Probably should have made a graphing function, but oh well. 
-Merge_preds_GDSC.IC50 %>% 
+figure4a <- Merge_preds_GDSC.IC50 %>% 
   semi_join(., non_modeled_CCLs) %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
     geom_point() + 
@@ -125,9 +128,12 @@ Merge_preds_GDSC.IC50 %>%
     labs(title = "Correlation of Imputed and Measured AZD-1775 Sensitivity \n in Cell Lines Unique to GDSC", 
          x = "Imputed Sensitivty Score", 
          y = "Measured ln(IC50) values from GDSC")
+figure4a
+figure4a <- figure4a + labs(title = NULL)
 
 #graph measured and Imputed response in only BRCA GSDC cell lines that are unique to GDSC, n = 16
-Merge_preds_GDSC.IC50 %>% 
+
+sup_fig4c <- Merge_preds_GDSC.IC50 %>% 
   semi_join(., non_modeled_CCLs) %>% 
   filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
   ggplot(aes(x = `MK-1775`, y = LN_IC50)) + 
@@ -137,13 +143,15 @@ Merge_preds_GDSC.IC50 %>%
     labs(title = "Correlation of Imputed and Measured AZD-1775 Sensitivity \n in Breast Cancer Cell Lines Unique to GDSC", 
          x = "Imputed Sensitivty Score", 
          y = "Measured ln(IC50) values from GDSC")
+sup_fig4c
+sup_fig4c <- sup_fig4c + labs(title = NULL)
 
 ```
 
 
 As we can see, even in the unique to GDSC cell lines, the Imputed and measured response correlates well. 
 
-Now these correlations almost perfectly match the overall correlations, but (for fun), we can also follow this up by checking how well the imputed and measured cell line response correlates in the cell lines that do appear in both datasets. 
+Now these correlations almost perfectly match the overall correlations, but (for fun), we can also follow this up by checking how well the imputed and measured cell line response correlates in the cell lines that do overlap, that do appear in both datasets. *This will not be included in the paper draft*
 
 ```{r overlap analysis: imputed}
 #use inner_join to find the CCLs that overlap with to GDSC, ie this time keeping ccls in GDSC that are also in CTRP
@@ -160,7 +168,7 @@ Merge_preds_GDSC.IC50 %>%
          x = "Imputed Sensitivty Score", 
          y = "Measured ln(IC50) values from GDSC")
 
-#graph measured and Imputed response in only BRCA GSDC cell lines that are unique to GDSC, n = 16
+#graph measured and Imputed response in only BRCA GSDC cell lines that are unique to GDSC, n = 33
 Merge_preds_GDSC.IC50 %>% 
   semi_join(., overlapping_CCLs) %>% 
   filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
@@ -183,7 +191,7 @@ However, it would be nice to have a standard to compare these results to, and we
 
 ```{r overlap analysis: measured}
 
-overlapping_CCLs %>% 
+fig4b <- overlapping_CCLs %>% 
   ggplot(aes(x = Avg_AUC, y = LN_IC50)) + 
     geom_point() + 
     geom_smooth(method = "lm") + 
@@ -192,8 +200,11 @@ overlapping_CCLs %>%
          x = "Measured AUC Values from CTRP", 
          y = "Measured ln(IC50) values from GDSC")
 
+fig4b
+fig4b <- fig4b + labs(title = NULL)
 
-overlapping_CCLs %>% 
+
+sup_4d <- overlapping_CCLs %>% 
   filter(`Cancer Statistics 2017 Sub-Category.x` == "Breast") %>% 
   ggplot(aes(x = Avg_AUC, y = LN_IC50)) + 
     geom_point() + 
@@ -203,13 +214,30 @@ overlapping_CCLs %>%
          x = "Measured AUC Values from CTRP", 
          y = "Measured ln(IC50) values from GDSC")
 
+sup_4d
+sup_4d <- sup_4d + labs(title = NULL)
+
 
 ```
 
 
-It is good to notice that the x-axis does change drastically. It is not surprising since pRROphetic uses a linear ridge regression model that does tend to decrease the overall variability between the input value and the output value. We could try to graph the relationships between the measured vs imputed on the same axis scale as the measured vs measured, but it looks very weird, seen below. 
+It is good to notice that the x-axis does change drastically in the "measured" values. It is not surprising since pRROphetic uses a linear ridge regression model that does tend to decrease the overall variability between the input value and the output value. If we remove some of the outliers, we can see the graph looks a bit better, but the correlation doesn't really improve or change (which makes sense since it is Spearman). We could also try to graph the relationships between the measured vs imputed on the same axis scale as the measured vs measured, but it looks very weird, seen below. 
 
-```{r }
+```{r axis fixing}
+
+#perhaps you could tell but there are some extreme values in the Measured AUC values that might be changing the data, so first I'll clip those values and see what happens
+overlapping_CCLs %>% 
+  filter(Avg_AUC < 15,
+         Avg_AUC > 5) %>% 
+  ggplot(aes(x = Avg_AUC, y = LN_IC50)) + 
+    geom_point() + 
+    geom_smooth(method = "lm") + 
+    ggpubr::stat_cor(method = "spearman") + 
+    labs(title = "Correlation of Measured CCL Sensitivity to AZD-1775 from GDSC and CTRP", 
+         x = "Measured AUC Values from CTRP", 
+         y = "Measured ln(IC50) values from GDSC")
+
+
 overlapping_CCLs %>% 
    ggplot(aes(x = Avg_AUC, y = LN_IC50)) + 
     geom_point() + 
