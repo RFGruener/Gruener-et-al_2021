@@ -68,6 +68,8 @@ genes_top <- TCGA_muts_idwa %>%
   mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) %>% 
   right_join(., top_drugs, by = "Drug")
 
+write_csv(genes_top, path = "./DataOut/Supplemental_table5.csv")
+
 graph_FDR_cutoff <- genes_top %>% 
   drop_na(Gene) %>% 
   filter(.$Gene %in% unique(.$Gene[order(.$FDR)])[1:12]) %>% #written this way, gets the top 12 (arbitrary, just for aesthetics) unique genes based on FDR value, then filters the dataset to keep these genes for all the drugs

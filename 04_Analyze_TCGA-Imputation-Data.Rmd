@@ -240,13 +240,6 @@ targets_t.test <- targets_t.test[!grepl(x = targets_t.test$Drug, pattern = "mol/
 
 targets_t.test
 
-
-#lets save the targets_t.test as a supplementary table
-targets_t.test %>% 
-  dplyr::select(Drug, "Pubchem ID" = `Harmonized ID (Pubchem ID)`, "Effect Size" = estimate, "Bonferroni Adjusted p-value" = bonf_p.value, 
-         MOA, Targets, `Clinical Phase`, `Source for Clinical Information`, "N Drugs with same MOA" = Total_MOA_Count) %>% 
-  write_csv(., path = "./DataOut/Supplementary Table 1.csv")
-
 ```
 
 
@@ -274,7 +267,7 @@ names(found_MOA) = missing_MOA$Drug
 targets_t.test$MOA[targets_t.test$Drug %in% names(found_MOA)] <- found_MOA
 
 #Note:  
-  #3-Cl-AHPC: Unclear, one publication claimed that it doesn't activate RAR and works through AKT (PMID: 14981538) while a much more recent publication says that it does (PMID: 30370662), while the database claims it is an orphan nuclear receptor agonist
+  #3-Cl-AHPC: Unclear, one publication claimed that it doesn't activate RAR and works through AKT (PMID: 14981538) while a much more recent publication says that it does work through RAR (PMID: 30370662), while the database claims it is an orphan nuclear receptor agonist
 
 #Finally, I ideally want this as simple as possible but some have multiple MOA listed. I will use the first one listed as the primary one, since it will be easiest thi s way. However, this isn't necessarily the best for this compound. It appears when there are multiple, it is listed in alphabetical order; however, this doesn't appear to matter for the MOAs that will be included in table 1. The exception is that a PLK inhibitor, since "cell cycle inhibitor" is listed first, this will be changed in the next line
 
@@ -311,7 +304,17 @@ top_TNBC_drugs <- top_targets_t.tst %>%
 
 top_TNBC_drugs
 
+#save the top_compounds as a table for the paper
 write_csv(top_TNBC_drugs, path = "./DataOut/Table1_draft.csv")
+
+#lets save the targets_t.test as a supplementary table
+targets_t.test %>% 
+  dplyr::select(Drug, "Pubchem ID" = `Harmonized ID (Pubchem ID)`, "Effect Size" = estimate, "Bonferroni Adjusted p-value" = bonf_p.value, 
+         MOA, Targets, `Clinical Phase`, `Source for Clinical Information`, "N Drugs with same MOA" = Total_MOA_Count) %>% 
+  write_csv(., path = "./DataOut/Supplementary Table 1.csv")
+
+
+
 
 ```
 
