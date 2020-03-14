@@ -72,16 +72,50 @@ BRCA_clinical <- full_join(BRCA_clinical, BRCA_pam50, by = c("bcr_patient_barcod
 
 ```
 
-This table shows the clinical breakdown by subtype. 
+Ki-67 staining is not available in TCGA, so we cannot do the traditional Lum A and Lum B groups for the clinical subtyping of ER+ tumors. However, this doesn't impact us too much as there we are focused on TNBC which can be easily defined in our dataset.  
+
+
+
+
+### Filtering drugs based on the cross-validation results
+It shouldn't be expected that every drug should be modeled accurately whether this is due to inconsistency of the screening data or problems with sample size or other model variables. 
 
 ```{r}
-table(BRCA_clinical$Clin_Subtype)
-table(BRCA_clinical$PAM50)
+CTRP_cv <- read_csv("./DataOut/20FoldCV_CTRP.csv")
+
+CTRP_cv <- CTRP_cv %>% 
+  filter(!grepl(pattern = "mol/mol", Drug))
+
+cv_cutoff <- CTRP_cv %>% 
+  filter(Spearman_Pvalue < 0.05,
+         Spearman_Correlation > 0)
+
+bad_cv_drugs <- anti_join(CTRP_cv, cv_cutoff)
+bad_cv_drugs <- bad_cv_drugs$Drug
+
+
+CTRP_cv %>% ggplot(aes(x = Spearman_Correlation)) + 
+  geom_histogram() + 
+  geom_vline(xintercept = min(cv_cutoff$Spearman_Correlation), color = "red") + 
+  labs(x = "Spearman R from CTRP cross-validation", y = "Number of Drugs")
 
 ```
 
-Ki-67 staining is not available in TCGA, so we cannot do the traditional Lum A and Lum B groups for the clinical subtyping of ER+ tumors. However, this doesn't impact us too much as there we are focused on TNBC which can be easily defined in our dataset.  
+```{r}
+drug_targets <- read_csv("./Included_Data/Drug_targets(review).csv") # From Ling and Gruener et al
 
+median(cv_cutoff$Spearman_Correlation)
+
+cv_targets <- cv_cutoff %>% 
+  left_join(., drug_targets, by = c("Drug" = "Name in Database")) %>% 
+  dplyr::select(-Database) %>% 
+  distinct() %>%  
+  filter(!Targets %in% c("#N/A", "0"))
+
+length(unique(unlist(strsplit(cv_targets$Targets, split = "\\|"))))
+
+
+```
 
 ### Merging Predictions with clinical data
 Next we need to load and format the prediction dataset, then we merge it with the clinical data we previously downloaded
@@ -93,7 +127,8 @@ BRCA_preds <- BRCA_preds %>%
   filter(grepl(Patient_ID, pattern = "\\.01A\\.|\\.01B\\.")) %>% #remove normal or metastatic samples
   mutate(Patient_ID = gsub(x = strtrim(Patient_ID, width = 12), pattern = "\\.", replacement = "-")) %>% 
   gather(key = "Drug", value = "PSS", -Patient_ID) %>% #turns the table into a long format
-  mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) #replaces MK-1775 as AZD-1775 since AZD-1775 is the more common name currently even though this is not how it is written in the database
+  mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) %>%  #replaces MK-1775 as AZD-1775 since AZD-1775 is the more common name currently even though this is not how it is written in the database
+  filter(!Drug %in% bad_cv_drugs) #filter out drugs with poor CV results
 
 
 #join with clinical information
@@ -103,9 +138,18 @@ preds.subtype <- left_join(BRCA_preds, BRCA_clinical, by = c("Patient_ID" = "bcr
 ```
 
 
+
 ### Tamoxifen imputated sensitivity and ER+ breast cancers
 We have reported on HER2 inhibitors in HER2 positive cancers previously, we can look for another proof-of-concept by looking at which drugs associate with the ER-positive BRCA cohort. We'll do a similar test, stratify between ER+ and non-ER+ and perform a t-test between the two, and look for the compounds that associate with the ER+ subset. 
 
+
+```{r patient information}
+#first how many patients 
+preds.subtype %>% select(Patient_ID, Clin_Subtype) %>% distinct() %>% count(Clin_Subtype)
+preds.subtype %>% select(Patient_ID, PAM50) %>% distinct() %>% count(PAM50)
+
+
+```
 
 ```{r ER Drugs}
 ###########ER and Tamoxifen Response#################
@@ -222,8 +266,6 @@ We want to look drugs that are imputed to be more effective, more selective for 
 We will use the review co-authored by Alex Ling and myself (Robert F. Gruener) to obtain drug target and pathway information on. 
 
 ```{r drug targets}
-
-drug_targets <- read_csv("./Included_Data/Drug_targets(review).csv") # From Ling and Gruener et al
 
 targets_t.test <-  t.tst_preds.subtype %>%
   mutate(Drug = replace(Drug, Drug == "AZD-1775", "MK-1775")) %>% #replacng MK1775 for AZD1775 since it will be easier to match using "Name in Database" instead of all names
