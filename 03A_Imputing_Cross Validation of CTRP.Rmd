@@ -25,6 +25,7 @@ needed_packages <- c("tidyverse", "qvalue", "affy", "GenomicFeatures", "org.Hs.e
                      "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
 lapply(needed_packages, require, character.only = TRUE)
 
+library(doParallel)
 
 ```
 
@@ -85,14 +86,21 @@ Note for the cross-validation. It takes up a lot of memory, especially if you do
 ```{r}
 
 #free up some memory 
-rm(list = keep(trainingPhenData, ExprData, testExprData))
+rm(list = keep(trainingPhenData, ExprData, testExprData, mk1775))
 
+possibleDrugs <- unique(trainingPhenData$cpd_name)
 
-possibleDrugs <- "MK-1775"
-
-corP <- numeric()
-corSpear <- numeric()
+corP_spear <- numeric()
+cor_spear <- numeric()
+corP_pearson <- numeric()
+cor_pearson <- numeric()
+RMSEs <- numeric()
 nAll <- numeric()
+
+rmse <- function(error){
+  sqrt(mean(error^2, na.rm = T))
+}
+
 
 ########make a for loop for each drug seperate#################
 for(i in 1:length(possibleDrugs)) { 
@@ -105,20 +113,114 @@ for(i in 1:length(possibleDrugs)) {
   AUCsOrd <- AUCs[commonCellLines]
   trainDataOrd <- ExprData[, commonCellLines]
   trainDataOrd <- trainDataOrd[(rowSums(trainDataOrd) != 0), ]
-
-  CTRP_LOOCV <- predictionAccuracyByCv(trainingExprData =  trainDataOrd, trainingPtype = AUCsOrd, testExprData = testExprData, cvFold = -1)
-  
+  CTRP_LOOCV <- predictionAccuracyByCv(trainingExprData =  trainDataOrd, trainingPtype = AUCsOrd, testExprData = testExprData, cvFold = 20)
   # correlations on all tumors.
-    theCor <- cor.test(CTRP_LOOCV[[1]], CTRP_LOOCV[[2]])
-    corP[i] <- theCor$p.value
-    corSpear[i] <- theCor$estimate
+    spearCor <- cor.test(CTRP_LOOCV[[1]], CTRP_LOOCV[[2]], method = "spearman")
+    corP_spear[i] <- spearCor$p.value
+    cor_spear[i] <- spearCor$estimate
+    
     nAll[i] <- length(CTRP_LOOCV[[1]])
-  
+    
+    pearson_Cor <- cor.test(CTRP_LOOCV[[1]], CTRP_LOOCV[[2]], method = "pearson")
+    corP_pearson[i] <- pearson_Cor$p.value
+    cor_pearson[i] <- pearson_Cor$estimate
+    error <- CTRP_LOOCV[[1]] - CTRP_LOOCV[[2]]
+    RMSEs[i] <- rmse(error)
+
   
 } #close for loop
 
-m <- cbind(nAll, corSpear, corP)
-colnames(m) <- c("N CCLs", "Spearman Correlation" , "Spearman P-value")
+m <- cbind(possibleDrugs, nAll, RMSEs, cor_spear, corP_spear, cor_pearson, corP_pearson)
+colnames(m) <- c("Drug", "N_CCLs","RMSE", "Spearman_Correlation" , "Spearman_Pvalue", "Pearson_Correlation", "Pearson_Pvalue")
 
+write.csv(m, file = "./DataOut/20FoldCV_CTRP.csv")
+```
+
+
+```{r CV analysis}
+cv <- as_tibble(m) %>% type_convert()
+
+CTRP_5CV <- read.delim(file = "E:/Research_Repos/1_git_repos/pRRophetic_plus/b_scripts-and-results/03_Model_testing_CV/Getting-good-predictions/CV_vs_AvgAUC/b. data_in/CTRPv2_RNAseq-TPM_5fold-CV.txt", sep = "\t")
+
+cv %>% 
+  ggplot(aes(x = Spearman_Correlation)) + 
+  geom_histogram()
+
+CTRP_5CV %>% 
+  ggplot(aes(x = Spearman_Cor)) + 
+  geom_histogram()
+
+left_join(cv, CTRP_5CV, by = c("Drug" = "Compound")) %>% 
+  ggplot(aes(x = Spearman_Correlation, y = Spearman_Cor)) +
+  geom_point() + 
+  geom_abline(slope = 1)
+
+#as we can tell, there isn't really any difference between this and the old results
 
 ```
+
+
+```{r cv and ncells}
+
+cv %>% 
+  ggplot(aes(x = N_CCLs, y = Spearman_Correlation)) +
+  geom_point() + 
+  theme_bw()
+
+cv %>% 
+  ggplot(aes(x = N_CCLs, y = Pearson_Correlation)) +
+  geom_point() + 
+  theme_bw()
+
+```
+ 
+Not quite what I expected
+
+```{r cv cutoff}
+
+cv %>% 
+  mutate(log10SpearP = log10(Spearman_Pvalue)) %>% 
+  ggplot(aes(x = -log10SpearP)) + 
+    geom_histogram() + 
+    geom_vline(xintercept = -log10(0.05))
+  
+cv %>% 
+  mutate(FDR_Spearman = p.adjust(p = Spearman_Pvalue, method = "fdr")) %>% 
+  mutate(log10FDR_SpearmanP = log10(FDR_Spearman)) %>% 
+  ggplot(aes(x = -log10FDR_SpearmanP)) + 
+    geom_histogram() + 
+    geom_vline(xintercept = -log10(0.05), color = "red")
+
+cv %>% 
+  count(Spearman_Pvalue < 0.05)
+
+cv %>% 
+  mutate(FDR_Spearman = p.adjust(p = Spearman_Pvalue, method = "fdr")) %>% 
+  count(FDR_Spearman < 0.05 )
+
+cv %>% 
+  mutate(FDR_Spearman = p.adjust(p = Spearman_Pvalue, method = "bonferroni")) %>% 
+  mutate(log10FDR_SpearmanP = -log10(FDR_Spearman)) %>% 
+  ggplot(aes(y = log10FDR_SpearmanP, x = Spearman_Correlation)) + 
+    geom_point() + 
+    geom_hline(yintercept = -log10(0.00001))
+
+cv %>% 
+  ggplot(aes(x = Spearman_Correlation, y = Pearson_Correlation)) +
+  geom_point() + 
+  geom_hline(yintercept = 0.25) + 
+  geom_vline(xintercept = 0.25)
+
+cv %>% 
+  ggplot(aes(x = log10(Spearman_Pvalue), y = log10(Pearson_Pvalue))) +
+  geom_point() 
+
+temp <- cv %>% 
+  filter(Spearman_Correlation > 0.1, 
+         Pearson_Correlation > 0.1, 
+         Pearson_Pvalue < 0.01, 
+         Spearman_Pvalue < 0.01)
+
+  
+```
+
