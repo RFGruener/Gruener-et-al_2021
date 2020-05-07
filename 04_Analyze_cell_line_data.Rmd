@@ -1,6 +1,9 @@
 ---
 title: "R Notebook"
 output: html_notebook
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 
@@ -255,4 +258,6 @@ for(i in 1:length(unique_experiments)) {
 
 
 
-
+```{r}
+print(sessionInfo())
+```

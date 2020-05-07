@@ -1,7 +1,9 @@
 ---
 title: "Analyze: GDSC (Cell Line) Imputations"
-author: "R. F. Gruener" 
 output: html_notebook
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 Analysis outline: 
@@ -18,11 +20,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 
 
 ```{r load some stuff, include = FALSE}
-if (!requireNamespace("TCGAbiolinks", quietly = TRUE))
-    BiocManager::install("TCGAbiolinks")
-
-if (!requireNamespace(c("broom", "ggpubr"), quietly = TRUE))
-    install.packages(c("broom", "ggpubr"))
 library(tidyverse)
 library(broom)
 library(readxl)
@@ -276,11 +273,28 @@ Merge_preds_GDSC.IC50 %>%
                    y = c(min(GDSCtomerge$LN_IC50), max(GDSCtomerge$LN_IC50)))
 ``` 
 
+```{r}
+
+ggsave(plot = figure4a, filename = "./Figures/Figure4a.png", width = 6, height = 4)
+ggsave(plot = fig4b, filename = "./Figures/Figure4b.png", width = 6, height = 4)
+
+ggsave(plot = sfig4a, filename = "./Figures/Supplmental_figure4a.png", width = 6, height = 4)
+ggsave(plot = sfig4b, filename = "./Figures/Supplmental_figure4b.png", width = 6, height = 4)
+
+ggsave(plot = sup_fig4c, filename = "./Figures/Supplmental_figure4c.png", width = 6, height = 4)
+ggsave(plot = sup_4d, filename = "./Figures/Supplmental_figure4d.png", width = 6, height = 4)
 
 
 
 
+```
 
+
+
+
+```{r}
+print(sessionInfo())
+```
 
 
 

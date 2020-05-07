@@ -1,6 +1,9 @@
 ---
 title: "GSEA: WEE1 Imputations"
 output: html_notebook
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 To ensure our imputations are picking up on biologically meaningful information, I will perform a GSEA using the patient RNA-Seq data with their imputed Wee1 inhibtion score as the continuous phenotype to cluster the patients. 
@@ -10,10 +13,8 @@ According to the [documentation online](http://software.broadinstitute.org/cance
 First, Gene expression data is just that from TCGA and .txt files are fine.
 
 ```{r Gene Expression Data}
-library(readr)
-
 # load  the breast cancer RNA-seq file downloaded previously
-tpmDatMat <- read_delim(file = "./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt", as.is=T)
+tpmDatMat <- read.delim(file = "./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt", as.is = T)
 tpmDatMat_tpm <- tpmDatMat[-1,which(tpmDatMat[1,] == "scaled_estimate")]
 tpmDatMat_tpm <- apply(tpmDatMat_tpm, 2, as.numeric)
 geneNames <- do.call(cbind, strsplit(tpmDatMat[, "Hybridization.REF"], "|", fixed=TRUE))[1,][-1]
@@ -21,7 +22,7 @@ rownames(tpmDatMat_tpm) <- geneNames
 colnames(tpmDatMat_tpm) <- substr(colnames(tpmDatMat_tpm), 1, 28)
 tpmDatMat_tpm_logged <- log((tpmDatMat_tpm*1000000)+1) # transform the data
 #remove adjacent normal RNA-seq samples
-testExprData <- tpmDatMat_tpm_logged[,-grep(pattern = ".11A.|.11B.|.10A.|.10B.", colnames(tpmDatMat_tpm_logged))]
+testExprData <- tpmDatMat_tpm_logged[,grep(pattern = ".01A.|.01B.", colnames(tpmDatMat_tpm_logged))]
 
 #Format names to remove unidentifiable genes "?", average duplicates, then remove any rows where the expression is 0 in all patients
 testExprData <- testExprData[rownames(testExprData) != "?",]
@@ -37,7 +38,7 @@ testExprData <- testExprData[rowSums(testExprData) != 0,]
 GSEAExprData <- cbind(DESCRIPTION = NA, testExprData)
 data.table::setDT(GSEAExprData, keep.rownames = "NAME")
 
-write_tsv(GSEAExprData, path = "./DataOut/GSEA_Expr_Data.txt")
+write.table(GSEAExprData, file = "./DataOut/GSEA_Expr_Data.txt", sep = "\t", row.names = F)
 
 ```
 
@@ -51,5 +52,93 @@ identical(colnames(GSEAExprData)[3:1100], names(MK1775_phen)) #check to make sur
 PhenGSEAData <- rbind(MK1775_phen)
 write.table(PhenGSEAData, file = "./DataOut/GSEA_Phen_Data.cls", row.names = F, col.names = F)
 
+#will need to do a bit of editing to prepare for GSEA
+
 ```
 
+
+```{r TNBC as the Phenotype Variable}
+library(TCGAbiolinks)
+library(tidyverse)
+#download the clinical data
+query <- GDCquery(project = "TCGA-BRCA", 
+                  data.category = "Clinical",
+                  data.type = "Clinical Supplement", 
+                  data.format = "BCR Biotab")
+GDCdownload(query)
+clinical.BCRtab.all <- GDCprepare(query)
+names(clinical.BCRtab.all)
+BRCA_clinical <- clinical.BCRtab.all$clinical_patient_brca %>%
+    dplyr::select(bcr_patient_barcode, er_status_by_ihc, er_status_ihc_Percent_Positive, pr_status_by_ihc, 
+                  pr_status_ihc_percent_positive, her2_status_by_ihc, her2_fish_status, ) %>%
+    dplyr::slice(-1:-2) %>% 
+    type_convert() %>% 
+    mutate(HER2_Subtype = if_else(condition = her2_fish_status %in% c("Positive", "Negative"), her2_fish_status, her2_status_by_ihc)) %>% 
+    filter(er_status_by_ihc %in% c("Positive", "Negative"), 
+           pr_status_by_ihc %in% c("Positive", "Negative"), 
+           HER2_Subtype %in% c("Positive", "Negative")) %>% 
+    mutate(Clin_Subtype = if_else(condition = er_status_by_ihc == "Positive" | pr_status_by_ihc == "Positive", 
+                                  true = if_else(condition = HER2_Subtype == "Positive", true = "ER/PR+, HER2+", false = "ER/PR+"),
+                                  false = if_else(condition = HER2_Subtype == "Positive", true = "HER2+", false = "TNBC"))) %>% 
+    mutate(TNBC_status = if_else(Clin_Subtype == "TNBC", "TNBC", "RPBC"))
+
+TNBC_phen <- BRCA_clinical %>% select(bcr_patient_barcode, TNBC_status) %>% 
+   spread(key = bcr_patient_barcode, value = TNBC_status)
+
+#TNBC_phen doesn't have all the breast cancer patients since some breast cancer patients were missing clinical information
+Filt_TNBCExprData <- GSEAExprData
+##need to format GSEA expression to only have first 12 characters so I can match
+names(Filt_TNBCExprData) <- gsub(strtrim(colnames(Filt_TNBCExprData), 12), pattern = "\\.", replacement = "-") 
+#keep only those that overlap
+Filt_TNBCExprData <- Filt_TNBCExprData[, colnames(Filt_TNBCExprData) %in% c(colnames(TNBC_phen), "NAME", "DESCRIPTION"), with = F]
+#order the names by the TNBCExprData
+TNBC_phen <- TNBC_phen[,names(Filt_TNBCExprData)[-1:-2]]
+identical(names(Filt_TNBCExprData)[3:ncol(Filt_TNBCExprData)], names(TNBC_phen))
+
+Filt_TNBCExprData$DESCRIPTION = NA #this seems to be an issue
+
+write.table(Filt_TNBCExprData, file = "./DataOut/TNBC_GSEA_Expr_Data.txt", sep = "\t", row.names = F)
+
+#do some editing to get phen data in proper format
+r3 <- str_c(TNBC_phen[1,], collapse = " ")
+r1 <- str_c(c(ncol(TNBC_phen), 2, 1), collapse = " ")
+r2 <- "# RPBC TNBC"
+cls_TNBC_phen <- data.frame(c(r1, r2, r3))
+write.table(cls_TNBC_phen, file = "./DataOut/TNBC_Phen_Data.cls", row.names = F, col.names = F, quote = F)
+
+```
+
+
+```{r Other Drugs}
+load("./DataOut/2015CTRP-Models_on_TCGA_BRCA.RData")
+
+filt_CTRPDrugPredictions_mat <- CTRPDrugPredictions_mat[,grep(pattern = ".01A.|.01B.", colnames(CTRPDrugPredictions_mat))]
+lepto_phen <- filt_CTRPDrugPredictions_mat[rownames(filt_CTRPDrugPredictions_mat) == "leptomycin B",]
+cr1_phen <- filt_CTRPDrugPredictions_mat[rownames(filt_CTRPDrugPredictions_mat) == "CR-1-31B",]
+mln_phen <- filt_CTRPDrugPredictions_mat[rownames(filt_CTRPDrugPredictions_mat) == "MLN2238",]
+
+filt_GSEAExprData <- GSEAExprData[ , which(colnames(GSEAExprData) %in% c(names(lepto_phen), "NAME", "DESCRIPTION")), with = F]
+
+identical(colnames(filt_GSEAExprData)[3:ncol(filt_GSEAExprData)], names(lepto_phen)) #check to make sure the order is the same, they are. Skip first two rows because they are the artificial ones I added NAME and Desciption
+
+#write CLS code
+r1 <- "#numeric"
+r2 <- "#leptomycin_ISS"
+r3 <- str_c(lepto_phen, collapse = " ")
+r4 <- "#CR131B_ISS"
+r5 <- str_c(cr1_phen, collapse = " ")
+r6 <- "#MLN2238_ISS"
+r7 <- str_c(mln_phen, collapse = " ")
+
+cls_lepto_phen <- data.frame(c(r1, r2, r3, r4, r5, r6, r7))
+write.table(cls_lepto_phen, file = "./DataOut/other_Phen_Data.cls", row.names = F, col.names = F, quote = F)
+
+
+#write GSEA expression data that is a bit weird because of those 2 missing entries even though it worked above without needing to filter... (see filt_GSEAExprData, currently line 117)
+write.table(filt_GSEAExprData, file = "./DataOut/weird_GSEA_Expr_Data.txt", sep = "\t", row.names = F)
+
+```
+
+```{r}
+print(sessionInfo())
+```

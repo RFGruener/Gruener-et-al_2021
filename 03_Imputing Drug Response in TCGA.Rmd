@@ -1,6 +1,9 @@
 ---
 title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug response in TCGA BRCA Tumors'
 output: html_notebook 
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 ### Objectives
@@ -25,9 +28,7 @@ The necessary packages and files should have been download in file 01_Downlaod
 ```{r loading packages and setting parameters, results= "hide"}
 set.seed(12345)
 #Loading Packages
-needed_packages <- c("tidyverse", "qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg19.knownGene", 
-                     "parallel", "biomaRt", "readxl", 
-                     "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
+needed_packages <- c("tidyverse", "readxl", "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
 lapply(needed_packages, require, character.only = TRUE)
 
 ###################### Set Parameters ##########################
@@ -133,7 +134,9 @@ save(CTRPDrugPredictions_mat, file= matrix_output_name)
 
 
 
-
+```{r}
+print(sessionInfo())
+```
 
 
 

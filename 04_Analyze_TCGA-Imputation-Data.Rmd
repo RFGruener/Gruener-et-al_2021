@@ -1,7 +1,9 @@
 ---
 title: "Analyzing TCGA (patient) Imputation Data"
-author: "R. F. Gruener"
 output: html_notebook
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 Analysis outline: 
@@ -18,16 +20,6 @@ knitr::opts_chunk$set(echo = FALSE, message = FALSE)
 
 
 ```{r install packages, include= FALSE}
-
-#download TCGAbiolinks if needed
-if(!requireNamespace("TCGAbiolinks", quietly = TRUE))
-    BiocManager::install("TCGAbiolinks")
-
-#download a slew of other packages if needed
-req_packages <- c("broom", "grid", "ggrepel", "lsr", "svglite")
-needed_packs <- req_packages[!(req_packages %in% installed.packages())]
-if(length(needed_packs)) install.packages(needed_packs)
-
 library(TCGAbiolinks)
 library(broom)
 library(readxl)
@@ -35,9 +27,7 @@ library(grid)
 library(ggrepel)
 library(tidyverse)
 
-
 theme_set(theme_bw())
-
 ```
 
 
@@ -94,10 +84,12 @@ bad_cv_drugs <- anti_join(CTRP_cv, cv_cutoff)
 bad_cv_drugs <- bad_cv_drugs$Drug
 
 
-CTRP_cv %>% ggplot(aes(x = Spearman_Correlation)) + 
+sup1 <- CTRP_cv %>% ggplot(aes(x = Spearman_Correlation)) + 
   geom_histogram() + 
   geom_vline(xintercept = min(cv_cutoff$Spearman_Correlation), color = "red") + 
   labs(x = "Spearman R from CTRP cross-validation", y = "Number of Drugs")
+sup1
+ggsave(plot = sup1, filename = "supplemental_figure_1.png")
 
 ```
 
@@ -128,7 +120,8 @@ BRCA_preds <- BRCA_preds %>%
   mutate(Patient_ID = gsub(x = strtrim(Patient_ID, width = 12), pattern = "\\.", replacement = "-")) %>% 
   gather(key = "Drug", value = "PSS", -Patient_ID) %>% #turns the table into a long format
   mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) %>%  #replaces MK-1775 as AZD-1775 since AZD-1775 is the more common name currently even though this is not how it is written in the database
-  filter(!Drug %in% bad_cv_drugs) #filter out drugs with poor CV results
+  filter(!Drug %in% bad_cv_drugs,
+         !grepl(pattern = "mol/mol", Drug)) #filter out drugs with poor CV results
 
 
 #join with clinical information
@@ -147,6 +140,9 @@ We have reported on HER2 inhibitors in HER2 positive cancers previously, we can 
 #first how many patients 
 preds.subtype %>% select(Patient_ID, Clin_Subtype) %>% distinct() %>% count(Clin_Subtype)
 preds.subtype %>% select(Patient_ID, PAM50) %>% distinct() %>% count(PAM50)
+
+preds.subtype %>% select(Drug) %>% distinct() %>% count(Drug)
+
 
 
 ```
@@ -185,21 +181,14 @@ t.tst_preds.subtype <- preds.subtype %>%
   mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
   mutate(log10_p.correct = -log10(bonf_p.value)) 
 
-#We could also look at the results via ANOVA and look for the most significantly different values between the clinical subgroups described before or the PAM50 subgroups. I'm keeping this analysis here but some of this may become supplemental.  
-aov_preds.subtype <- preds.subtype %>%
+#We could also look at the results via the PAM50 subgroups. I'm keeping this analysis here but some of this may become supplemental.  
+PAM50_preds.subtype <- preds.subtype %>%
+  mutate(Basal_status = if_else(PAM50 == "Basal", "Basal", "non-Basal")) %>% 
   group_by(Drug) %>%
-  do(tidy(aov(.$PSS ~ .$PAM50))) %>%
-  ungroup() %>% 
-  filter(term == ".$PAM50") %>%
-  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni"))
-
-clin_aov_preds.subtype <- preds.subtype %>%
-  group_by(Drug) %>%
-  do(tidy(aov(.$PSS ~ .$Clin_Subtype))) %>%
-  ungroup() %>% 
-  filter(term == ".$Clin_Subtype") %>%
-  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni"))
-
+  do(tidy(t.test(PSS~Basal_status, data = .))) %>% #way to perform t-tests and get the results from the t-test into a tbl format
+  ungroup() %>% #need to ungroup so that when we adjust we are adjusting everything, otherwise the group is set to make each drug independent
+  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
+  mutate(log10_p.correct = -log10(bonf_p.value)) 
 
 
 ```
@@ -265,7 +254,7 @@ fig2a <- t.tst_preds.subtype %>%
     theme(plot.title = element_text(hjust = 0.5))
 fig2a
 
-ggsave(filename = "./Figures/Figure2a.svg", plot = fig2a)
+ggsave(filename = "./Figures/Figure2a.png", plot = fig2a, height = 5, width = 7)
     
 ```
 
@@ -285,12 +274,9 @@ targets_t.test <-  t.tst_preds.subtype %>%
   left_join(., drug_targets, by = c("Drug" = "Name in Database")) %>% 
   dplyr::select(-Database) %>% 
   distinct() %>% 
-  mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) %>% 
+  mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775"), 
+         Drug = replace(Drug, Drug == "triazolothiadiazine", "ML030")) %>% 
   arrange(bonf_p.value)
-
-#there are a couple of issues. First there are combinations that are tested, and these are difficult to attribute a MOA to, so for simplicity I will remove these. 
-
-targets_t.test <- targets_t.test[!grepl(x = targets_t.test$Drug, pattern = "mol/mol"),]
 
 targets_t.test
 
@@ -298,34 +284,46 @@ targets_t.test
 
 
 
-```{r top drugs}
+```{r top drugs MOA}
 
-#From here I'm more concerned about the top compounds based on effect size and p-value 
+#For the table in the text of the paper, I'm going to include only the top 10% based on both effect size and significance, sorted by mechanism of action. Here is roughly what I'll be looking for, some edits in excel may be called for:
 
-effect_cutoff <- sort(abs(t.tst_preds.subtype$estimate), decreasing = T)[43] #there are 427 drugs, so 43 would be the top 10%
-p_val_cutoff <- sort(abs(t.tst_preds.subtype$bonf_p.value), decreasing = F)[43] 
+#Here I'm more concerned about the top compounds based on effect size and p-value, so find the cutoff based on the ~290 sig drugs
+e_10_cutoff <- sort(abs(t.tst_preds.subtype$estimate), decreasing = T)[34] 
+p_10_cutoff <- sort(abs(t.tst_preds.subtype$bonf_p.value), decreasing = F)[34]
 
-top_targets_t.tst <- targets_t.test %>% 
- filter(estimate > effect_cutoff,
-         bonf_p.value < p_val_cutoff) 
-
-targets_t.test$MOA[targets_t.test$MOA == "cell cycle inhibitor|PLK inhibitor"] <- "PLK inhibitor|cell cycle inhibitor"
-targets_t.test$MOA <- gsub(pattern = "\\|.*$", replacement = "", x = targets_t.test$MOA) #only keeps the first MOA listed
-
-targets_t.test <- targets_t.test %>% count(MOA, name = "Total_MOA_Count") %>% left_join(targets_t.test, .)
-
-#For the table in the text, I'm going to include only the top 5% MOA, but I'm going to also include any compound that fits in this MOA that appears in the top 10%. Looking at the data, several inhibitors are in the top 10% that match the top 5% and as such it seems like most of the top compounds have pretty consistent mechanisms of actions.  I'll make a table for the actual text in excel using the Supplementary data and some filters, but here is roughly what I'll be looking for:
-
-e_10_cutoff <- sort(abs(t.tst_preds.subtype$estimate), decreasing = T)[43] 
-p_10_cutoff <- sort(abs(t.tst_preds.subtype$bonf_p.value), decreasing = F)[43]
-
-top_targets_t.tst <- targets_t.test %>% 
+temp_top_targets_t.tst <- targets_t.test %>% 
  filter(estimate > e_10_cutoff,
          bonf_p.value < p_10_cutoff) 
 
+nrow(temp_top_targets_t.tst) #there are 17 drugs that fit these cut-offs
 
-e_5_cutoff <- sort(abs(t.tst_preds.subtype$estimate), decreasing = T)[21] 
-p_5_cutoff <- sort(abs(t.tst_preds.subtype$bonf_p.value), decreasing = F)[21]
+# Second, some compounds may not have MOA information, but most of these do have gene targets listed. I will use the gene target information and do some quick validation (read: googling) on the compound and targets to be able to convert them into a 
+missing_MOA <- temp_top_targets_t.tst[temp_top_targets_t.tst$MOA %in% c("0","#N/A"),]
+missing_MOA
+found_MOA <- vector(mode= "character", length = nrow(missing_MOA))
+found_MOA <- c("translation (eIF4F complex) inhibiitor", "CDK inhibitor", "phosphodiesterase inhibitor", "translation (eIF4F complex) inhibiitor")
+names(found_MOA) = c("CR-1-31B", "BRD-K30748066", "ML030", "SR-II-138A")
+
+#update the original df with this information too
+targets_t.test$MOA[targets_t.test$Drug %in% names(found_MOA)] <- found_MOA
+
+```
+
+
+```{r Table 1: Lead Candidates for TNBC by MOA}
+#Finally, I ideally want this as simple as possible but some have multiple MOA listed. I will use the first one listed as the primary one, since it will be easiest thi s way. However, this isn't necessarily the best for this compound. It appears when there are multiple, it is listed in alphabetical order; however, this doesn't appear to matter for the MOAs that will be included in table 1. The exception is that a PLK inhibitor, since "cell cycle inhibitor" is listed first, this will be changed in the next line
+
+targets_t.test$MOA[targets_t.test$MOA == "cell cycle inhibitor|PLK inhibitor"] <- "PLK inhibitor|cell cycle inhibitor"
+targets_t.test$MOA <- gsub(pattern = "\\|.*$", replacement = "", x = targets_t.test$MOA) #only keeps the first MOA listed
+targets_t.test <- targets_t.test %>% count(MOA, name = "Total_MOA_Count") %>% left_join(targets_t.test, .)
+
+#now that there have been updates to the original df, rewrite the top_targets_t.tst
+top_targets_t.tst <- targets_t.test %>% 
+ filter(estimate > e_10_cutoff,
+         bonf_p.value < p_10_cutoff)
+
+#now for the top compounds get a table that is MOA focused with a "total MOA" count and a count for the number of top compounds 
 
 top_TNBC_drugs <- top_targets_t.tst %>% 
   count(MOA, Total_MOA_Count, sort = T) %>% 
@@ -333,8 +331,8 @@ top_TNBC_drugs <- top_targets_t.tst %>%
   dplyr::group_by(MOA) %>% 
   mutate(drugs = paste(Drug, collapse = ", ")) %>% 
   ungroup() %>% 
-  filter(estimate >= e_5_cutoff,
-        bonf_p.value <= p_5_cutoff) %>%
+  filter(estimate >= e_10_cutoff,
+        bonf_p.value <= p_10_cutoff) %>%
   arrange(bonf_p.value) %>% 
   select(MOA, Total_MOA_Count, n, drugs) %>% 
   distinct()
@@ -344,14 +342,14 @@ top_TNBC_drugs
 #save the top_compounds as a table for the paper
 write_csv(top_TNBC_drugs, path = "./DataOut/Table1_draft.csv")
 
-#lets save the targets_t.test as a supplementary table
+#lets save the top_targets_t.test as a supplementary table
 targets_t.test %>% 
-  dplyr::select(Drug, "Pubchem ID" = `Harmonized ID (Pubchem ID)`, "Effect Size" = estimate, "Bonferroni Adjusted p-value" = bonf_p.value, 
-         MOA, Targets, `Clinical Phase`, `Source for Clinical Information`, "N Drugs with same MOA" = Total_MOA_Count) %>% 
+  mutate(MOA = na_if(MOA, MOA %in% c("0", "#N/A"))) %>% 
+  arrange(bonf_p.value) %>% 
+  dplyr::select(Drug, "Pubchem ID" = `Harmonized ID (Pubchem ID)`, "Effect Size" = estimate, 
+                "Bonferroni Adjusted p-value" = bonf_p.value, MOA, Targets, 
+                `Clinical Phase`, `Source for Clinical Information`, "N Drugs with same MOA" = Total_MOA_Count) %>% 
   write_csv(., path = "./DataOut/Supplementary Table 1.csv")
-
-
-
 
 ```
 
@@ -427,7 +425,7 @@ azd_clin <- azd_clin +
        x = "TCGA Patients by Clinical BRCA Subtype")
 azd_clin
 
-ggsave(filename = "./Figures/Figure2b.svg", plot = azd_clin)
+ggsave(filename = "./Figures/Figure2b.png", plot = azd_clin)
 
 
 azd_pam <- azd_pam + 
@@ -436,7 +434,7 @@ azd_pam <- azd_pam +
        x = "TCGA Patients by PAM50 Subtype")
 azd_pam
 
-ggsave(filename = "./Figures/Figure2c.svg", plot = azd_pam)
+ggsave(filename = "./Figures/Figure2c.png", plot = azd_pam)
 ```
 
 ```{r Tamoxifen Graphs}
@@ -444,17 +442,19 @@ ggsave(filename = "./Figures/Figure2c.svg", plot = azd_pam)
 tam_clin <- tam_clin +
     labs(title = "Tamoxifen's Imputed Sensitivity in TCGA BRCA Cohort by Receptor Status")
 tam_clin
-ggsave(filename = "./Figures/Supplement_2a.svg", plot = tam_clin)
+ggsave(filename = "./Figures/Supplement_2a.png", plot = tam_clin)
 
 tam_pam <- tam_pam + 
   labs(title = "Tamoxifen's Imputed Sensitivity in TCGA BRCA Cohort by PAM50 Subtype")
 tam_pam
-ggsave(filename = "./Figures/Supplement_2b.svg", plot = tam_pam)
+ggsave(filename = "./Figures/Supplement_2b.png", plot = tam_pam)
 
 ```
 
 
 
-
+```{r}
+print(sessionInfo())
+```
 
 

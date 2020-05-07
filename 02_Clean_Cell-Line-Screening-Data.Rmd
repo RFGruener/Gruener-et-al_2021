@@ -1,6 +1,9 @@
 ---
 title: "Cleaning Screening Data"
 output: html_notebook
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 ## Objectives:
@@ -193,4 +196,6 @@ Then clean the CCLE RNA-Seq data
       write.table(CTRPv2_RNAseq.tpm, "./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt", sep = "\t", quote = F, row.names = T, col.names = NA)
 ```
 
-
+```{r}
+print(sessionInfo())
+```

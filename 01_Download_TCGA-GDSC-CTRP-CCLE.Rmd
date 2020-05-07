@@ -1,6 +1,11 @@
 ---
 title: "Download GDSC, CTRP, and TCGA Data"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 ## Objectives:
@@ -12,14 +17,14 @@ The goal of this file is to: download and install the necessary packages and fil
  * Download the RNA-Seq information
  * Download the TCGA dataset
  
-Important note, certain files are already included in this "Included_Data" directory including "pRRophetic_0.5.tar.gz" , "All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Particularly for the first two files listed, they are needed to run the imputations, the last for Analyzing the imputation data in GDSC. 
+Important note, certain other files are needed as well: "pRRophetic_0.5.tar.gz" will be needed to perform the imputations. "All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Are needed for the TNBC analysis, but those downloads are separate. 
 
-pRRophetic_0.5.tar.gz can be downloaded here
-All Cell Line Infor.xlsx is already included in this github repo, it was originally published in our review doi:
-Breast_CCL_Subtypes.csv is already included in this github repo, it was originally part of this publication citation, doi:, supplemental table X
+pRRophetic_0.5.tar.gz can be downloaded [here](https://osf.io/dwzce/?action=download). Place this in the repository or change the location of the installation in the first code chunk. 
+
+"All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Are needed for the TNBC analysis, but those downloads are separate.  
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = F, cache = T)
 ```
 
 
@@ -36,17 +41,14 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 if (!requireNamespace(c("car", "ridge", "preprocessCore", "genefilter", "sva"), quietly = TRUE)) 
     BiocManager::install(c("car", "ridge", "preprocessCore", "genefilter", "sva"))
 
-#install pRRophetic from tar.gz file (place in repo seperately)
+#install pRRophetic from tar.gz file (must be placed in repo seperately, or the location needs to be changed)
 if (!requireNamespace("pRRophetic", quietly = TRUE)) 
     install.packages("pRRophetic_0.5.tar.gz", repos = NULL, type = "source")
 
-#install other packages that will be used in this script
-if (!requireNamespace(c("qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "biomaRt" , 
-                        "TxDb.Hsapiens.UCSC.hg19.knownGene", "glmnet", "gdata", "tidyverse", 
-                        "illuminaHumanv4.db", "broom", "ggpubr"), quietly = TRUE)) 
-    BiocManager::install(c("qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "biomaRt" , 
-                        "TxDb.Hsapiens.UCSC.hg19.knownGene", "glmnet", "gdata", "tidyverse", 
-                        "illuminaHumanv4.db", "broom", "ggpubr"))
+#install other packages that will be used in this project
+req_packages <- c("readxl", "TCGAbiolinks", "tidyverse", "magrittr", "ggpubr", "broom", "grid", "ggrepel", "lsr", "svglite")
+needed_packs <- req_packages[!(req_packages %in% installed.packages())]
+if(length(needed_packs)) BiocManager::install(needed_packs)
 
 dir.create("./DataIn")
 
@@ -57,12 +59,17 @@ dir.create("./DataIn")
 
 #### Download the data from GDSC. 
 
+Downloading the GDSC2 data from Sanger. Last attempted 5/2020, downloaded data from July 2019 update: Release 8.0. 
+
+
 NB: Can find the GDSC expression data [at this link](https://www.cancerrxgene.org/gdsc1000/GDSC1000_WebResources//Data/preprocessed/Cell_line_RMA_proc_basalExp.txt.zip )
-However, this information wasn't updated any since 2016 and the 2016 data is already packaged into this version of pRRophetic as cgp2016ExprRma, so we will just call the data from pRRophetic. 
+However, this information wasn't updated any since 2016 and the 2016 data is already packaged into this version of pRRophetic as cgp2016ExprRma, so we will just call the data from pRRophetic.(True as of 9/2019) 
 
 ```{r downloading GDSC IC50 data}
+
+#downloading the GDSC2 8.0 release
 dir.create("./DataIn/GDSC")
-download.file(url = "ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/current_release/GDSC2_fitted_dose_response_17Jul19.xlsx",
+download.file(url = "ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/release-8.0/GDSC2_fitted_dose_response_17Jul19.xlsx",
                 destfile = "./DataIn/GDSC/GDSC_IC50_July2019.xlsx", mode = "wb")
 
 ```
@@ -106,3 +113,9 @@ unlink("./DataIn/TCGA/TCGA_BRCA_RNA-seq.tar.gz")
 
 
 ```
+
+
+```{r}
+print(sessionInfo())
+```
+

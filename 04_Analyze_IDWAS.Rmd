@@ -1,6 +1,9 @@
 ---
 title: "Analyze IDWAS Results"
 output: html_notebook
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 Now that we have a drug list, we can identify what pathways these drugs target. The list indicates that cell cycle is the most prominent pathway targeted. 
@@ -15,7 +18,7 @@ We can go further and use the entire TCGA patient data and find associations bet
 
 library(tidyverse)
 theme_set(theme_bw())
-TCGA_BRCA_muts_idwa <- read_csv("E:/Research/a) General-methods_Imputations_Biomarkers/b) IDWAS and Biomarkers/IDWAS/tables/CTRPResults_BRCAonly.csv")
+TCGA_BRCA_muts_idwa <- read_csv("./Included_data/CTRPResults_BRCAonly.csv")
 
 IDWAS_results <-  TCGA_BRCA_muts_idwa %>% 
   separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>% 
@@ -49,11 +52,14 @@ IDWAS_results %>%
 
 ```
 
+```{r}
+ggsave(plot = azd_p53, filename = "./Figures/Figure3b.png")
+```
 
-```{r Gene-Based Analysis}
 
-TCGA_muts_idwa <- read_csv("E:/Research/a) General-methods_Imputations_Biomarkers/b) IDWAS and Biomarkers/IDWAS/tables/CTRP_TCGAmuts_allResults_controlFORtissue.csv")
+```{r Top 12 Gene-Based Analysis}
 
+TCGA_muts_idwa <- IDWAS_results
 
 table_top_drugs <- read_csv("./DataOut/Table1_draft.csv")
 
@@ -62,54 +68,143 @@ top_drugs <- table_top_drugs %>%
   rename(Drug = drugs)
 
 genes_top <- TCGA_muts_idwa %>% 
-  separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>%
-  rename(FDR = `FDR (BH corrected)`) %>% 
-  mutate(logFDR = -log10(FDR)) %>% 
   mutate(Drug = replace(Drug, Drug == "MK-1775", "AZD-1775")) %>% 
-  right_join(., top_drugs, by = "Drug")
+  right_join(., top_drugs, by = "Drug") %>% 
+  drop_na(Gene) %>% 
+  mutate(color = if_else(Drug == "AZD-1775", "AZD-1775",
+                         if_else(MOA %in% c("CDK inhibitor", "CHK inhibitor", "PLK inhibitor"), "Cell Cycle", "Other")))
 
 write_csv(genes_top, path = "./DataOut/Supplemental_table5.csv")
 
 graph_FDR_cutoff <- genes_top %>% 
   drop_na(Gene) %>% 
-  filter(.$Gene %in% unique(.$Gene[order(.$FDR)])[1:12]) %>% #written this way, gets the top 12 (arbitrary, just for aesthetics) unique genes based on FDR value, then filters the dataset to keep these genes for all the drugs
-  mutate(Gene = factor(x = Gene, levels = unique(.$Gene[order(.$FDR)])[1:12]))
-
-graph_FDR_cutoff %>% 
+  filter(Gene %in% unique(.$Gene[order(.$FDR)])[1:12]) %>% #written this way, gets the top 12 (arbitrary, just for aesthetics) unique genes based on FDR value, then filters the dataset to keep these genes for all the drugs
+  mutate(Gene = factor(x = Gene, levels = unique(.$Gene[order(.$FDR)])[1:12])) %>% 
   mutate(color = if_else(Drug == "AZD-1775", "AZD-1775",
-                         if_else(MOA %in% c("CDK inhibitor", "CHK inhibitor", "PLK inhibitor"), "Cell Cycle", "Other"))) %>% 
+                         if_else(MOA %in% c("CDK inhibitor", "CHK inhibitor", "PLK inhibitor"), "Cell Cycle", "Other")))
+
+sup3a <- graph_FDR_cutoff  %>% 
   ggplot(mapping = aes(x = `Effect Size (beta)`, y = logFDR, color = color)) + 
     geom_point() + 
     facet_wrap(~Gene, scales = "free_y") +
     geom_vline(xintercept = 0, color = "black", linetype = "dashed") + 
-    geom_hline(yintercept = -log10(0.01), color = "red") + 
-    labs(title = "Top Mutation-Imputed-Drug Associations in TCGA",
-         y = "-log(FDR)") + 
+    geom_hline(yintercept = -log10(0.05), color = "red") + 
+    labs(y = "-log(FDR)") + 
     theme(plot.title = element_text(hjust = 0.5)) + 
-    scale_color_manual(values = c("red", "light blue2", "black"))
+    scale_color_manual(values = c("red", "#2471A3", "black")) + 
+    theme(legend.position = "top")
 
-sup3a <- graph_FDR_cutoff %>% 
-  mutate(`Mechanism of Action` = if_else(Drug == "AZD-1775", " Wee1 Inhibition",
-                         if_else(MOA %in% c("CDK inhibitor", "CHK inhibitor", "PLK inhibitor"), "Cell Cycle", "Other"))) %>% 
-  ggplot(mapping = aes(x = `Effect Size (beta)`, y = logFDR, color = `Mechanism of Action`)) + 
+sup3a 
+
+
+```
+
+
+```{r All Significant Gene-Based Analysis}
+
+graph_FDR_cutoff <- genes_top %>% 
+  filter(Gene %in% unique(.$Gene[.$FDR < 0.05])) %>% 
+  mutate(Gene = factor(x = Gene, levels = unique(.$Gene[order(.$FDR)]))) 
+
+test_graph_allsigs <- graph_FDR_cutoff  %>% 
+  ggplot(mapping = aes(x = `Effect Size (beta)`, y = logFDR, color = color)) + 
     geom_point() + 
     facet_wrap(~Gene, scales = "free_y") +
     geom_vline(xintercept = 0, color = "black", linetype = "dashed") + 
-    geom_hline(yintercept = -log10(0.01), color = "red") + 
+    geom_hline(yintercept = -log10(0.05), color = "red") + 
     labs(y = "-log(FDR)") + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
     scale_color_manual(values = c("red", "#2471A3", "black")) + 
     theme(legend.position = "top")
+
+test_graph_allsigs 
 
 
 ```
 
 
 ```{r}
-graph_FDR_cutoff %>% filter(logFDR > 5) %>% arrange(FDR)
+genes_top %>% filter(logFDR > -log10(0.05)) %>% arrange(Drug) %>% 
+  group_by(Gene) %>% mutate(Drugs = paste(Drug, collapse = ", ")) %>% count(Gene, Drugs) %>% select(Gene, n, Drugs) %>% knitr::kable(.)
+
+genes_top %>% filter(logFDR > -log10(0.05)) %>% arrange(Gene) %>% 
+  group_by(Drug) %>% mutate(Genes = paste(Gene, collapse = ", ")) %>% count(Genes, Drug) %>%  select(Drug, n, Genes) %>% 
+  knitr::kable(.)
+
+genes_top %>% filter(logFDR > -log10(0.05)) %>% arrange(Gene) %>% 
+  group_by(Drug) %>% mutate(Genes = paste(Gene, collapse = ", ")) %>% count(Genes, Drug, MOA) %>%  select(Drug, n, Genes, MOA) %>% 
+  arrange(MOA) %>%  knitr::kable(.)
+
+genes_top %>% filter(logFDR > -log10(0.05), color %in% c("AZD-1775", "Cell Cycle")) %>% arrange(Drug) %>% 
+  group_by(Gene) %>% mutate(Drugs = paste(Drug, collapse = ", ")) %>% count(Gene, Drugs) %>%  select(Gene, n, Drugs) %>% 
+  arrange(desc(n)) %>%  knitr::kable(.)
 
 ```
 
 
+```{r}
+genes_top %>% filter(logFDR > -log10(0.05)) %>% arrange(Gene) %>% mutate(drug_spread = Drug) %>% select(drug_spread, Drug, Gene) %>% 
+   spread(key = Gene, value = drug_spread) 
+
+genes_top %>% filter(logFDR > -log10(0.05)) %>% arrange(Gene) %>% select(MOA, Drug, Gene) %>% 
+   spread(key = Gene, value = MOA)
+  
+
+genes_top %>% filter(logFDR > -log10(0.05)) %>% arrange(Gene) %>% select(MOA, Drug, Gene, color) %>% 
+  ggplot(aes(x = Drug, y = Gene, fill = color)) +
+  geom_tile() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+
+```
+
+
+
+
+
+
+Only include the genes that significantly associate with AZD-1775
+```{r AZD-1775 Focused Figure}
+graph_FDR_cutoff <- genes_top %>% 
+  filter(FDR < 0.047, Drug == "AZD-1775") %>% select(Gene) %>% left_join(.,genes_top) %>% 
+  mutate(Gene = factor(x = Gene, levels = unique(.$Gene[order(.$FDR)]))) 
+
+azd1775_graph_allsigs <- graph_FDR_cutoff  %>% 
+  ggplot(mapping = aes(x = `Effect Size (beta)`, y = logFDR, color = color)) + 
+    geom_point() + 
+    facet_wrap(~Gene, scales = "free_y") +
+    scale_y_continuous(limits=c(0,NA)) +
+    geom_vline(xintercept = 0, color = "black", linetype = "dashed") + 
+    geom_hline(yintercept = -log10(0.05), color = "red") + 
+    labs(y = "-log(FDR)") + 
+    theme(plot.title = element_text(hjust = 0.5)) + 
+    scale_color_manual(values = c("red", "#2471A3", "black")) + 
+    theme(legend.position = "top")
+
+azd1775_graph_allsigs 
+```
+
+```{r}
+ggsave(plot = azd1775_graph_allsigs, filename = "./Figures/Supplemental_Figure_3.png", height = 5.61, width = 8.68)
+```
+
+
+
+```{r Only cell cycle MOA}
+genes_top %>% filter(Gene %in% unique(.$Gene[.$FDR < 0.05]), color %in% c("AZD-1775", "Cell Cycle")) %>%   
+  mutate(Gene = factor(x = Gene, levels = unique(.$Gene[order(.$FDR)]))) %>% 
+  ggplot(mapping = aes(x = `Effect Size (beta)`, y = logFDR, color = MOA)) + 
+    geom_point() + 
+    facet_wrap(~Gene, scales = "free_y") +
+    geom_vline(xintercept = 0, color = "black", linetype = "dashed") + 
+    geom_hline(yintercept = -log10(0.05), color = "red") + 
+    labs(y = "-log(FDR)") + 
+    theme(plot.title = element_text(hjust = 0.5)) +  
+    theme(legend.position = "top")
+  
+  
+```
 
 
 ##### Supplmental Code
@@ -160,4 +255,6 @@ all_tcga_azd1775 %>%
 
 ```
 
-
+```{r}
+print(sessionInfo())
+```

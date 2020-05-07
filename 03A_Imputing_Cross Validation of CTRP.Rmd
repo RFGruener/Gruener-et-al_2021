@@ -1,3 +1,11 @@
+---
+title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug response in TCGA BRCA Tumors'
+output: html_notebook 
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
+---
+
 ### Objectives
 
 Do the imputations
@@ -5,7 +13,7 @@ Do the imputations
  * Set the parameters
  * Load the test expression data (TCGA Breast Cancer)
  * Load the CTRP/CCLE Training expression and drug data
- * Generate the models and impute using the pRRophetic framework 
+ * Run the cross-validation 
 
 Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. 
 
@@ -20,12 +28,10 @@ The necessary packages and files should have been download in file 01_Downlaod
 ```{r loading packages and setting parameters, results= "hide"}
 set.seed(12345)
 #Loading Packages
-needed_packages <- c("tidyverse", "qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg19.knownGene", 
-                     "parallel", "biomaRt", "readxl", 
-                     "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
+needed_packages <- c("tidyverse", "readxl", "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
 lapply(needed_packages, require, character.only = TRUE)
 
-library(doParallel)
+# library(doParallel), could easily be made to run in parallel
 
 ```
 
@@ -224,3 +230,6 @@ temp <- cv %>%
   
 ```
 
+```{r}
+print(sessionInfo())
+```

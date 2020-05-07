@@ -1,6 +1,9 @@
 ---
 title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug response in GDSC cell lines'
 output: html_notebook 
+author:
+  - "Robert F. Gruener"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 
 ### Objectives
@@ -149,4 +152,6 @@ save(CTRPDrugPredictions_mat, file= matrix_output_name)
 
 ```
 
-
+```{r}
+print(sessionInfo())
+```
