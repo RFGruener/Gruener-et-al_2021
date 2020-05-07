@@ -8,3 +8,5 @@ DataOut/
 GDCdata/
 *_cache/
 Figures/
+CTRPResults_BRCAonly.csv
+CTRPResults_TNBConly.csv
