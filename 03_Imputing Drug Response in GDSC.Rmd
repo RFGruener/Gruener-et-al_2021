@@ -38,13 +38,13 @@ matrix_output_name <- "./DataOut/CTRP-models_in_GDSC.Rdata"
 
 # Finally, set parameters of pRRophetic's calcphenotype function 
 #batchCorrect options: "eb" for ComBat, "qn" for quantiles normalization, "standardize", or "none"
-batchCorrect <- "eb"
+batchCorrect <- "standardize"
 #powerTransformPhenotype: does a power transformation to the phenotype data, recommended over log transformations by the literture for use in Ridge regression 
 powerTransformPhenotype <- TRUE
 #removeLowVaryingGenes: percentage of low varying genes to remove, default is at 0.2 
 removeLowVaryingGenes <- 0.2
 #removeLowVaryingGenesFrom: where should it remove low varying genes from "homogenizeData" or "rawData"
-removeLowVaringGenesFrom <- "homogenizeData"
+removeLowVaringGenesFrom <- "rawData"
 #minNumSamples: minimum number of training samples, set to 30, but this shouldn't be an issue since the there are many samples 
 minNumSamples = 30
 #selection: how to deal with duplicated gene IDs, -1 for ask user, 1 for summarize by mean, 2 for disregard duplicates
