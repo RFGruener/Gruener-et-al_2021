@@ -5,7 +5,9 @@ author:
   - "Robert F. Gruener"
 date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
-
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
 ### Objectives
 
 Do the imputations
@@ -17,9 +19,7 @@ Do the imputations
 
 Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. 
 
-```{r, include=FALSE}
-knitr::opts_chunk$set(echo = T, results = "hide", message = "hide")
-```
+
 
 ### First, load packages and set parameters
 

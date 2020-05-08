@@ -5,6 +5,9 @@ author:
   - "Robert F. Gruener"
 date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
 
 Analysis outline: 
 
@@ -13,10 +16,6 @@ Analysis outline:
   * Perform correlation analysis between imputed and measured responses 
   * Get cell line subtypes for the GDSC cell lines
   * Subtype the cell lines into TNBC and RPBC CCLs and perform t-test and see if the results also indicate that AZD1775 is more sensitive in TNBC cell lines 
-
-```{r, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
-```
 
 
 ```{r load some stuff, include = FALSE}

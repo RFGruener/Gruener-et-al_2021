@@ -5,6 +5,9 @@ author:
   - "Robert F. Gruener"
 date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
 
 To ensure our imputations are picking up on biologically meaningful information, I will perform a GSEA using the patient RNA-Seq data with their imputed Wee1 inhibtion score as the continuous phenotype to cluster the patients. 
 

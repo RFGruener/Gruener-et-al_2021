@@ -10,6 +10,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
+<meta name="author" content="Robert F. Gruener" />
 
 
 <title>Download GDSC, CTRP, and TCGA Data</title>
@@ -1634,6 +1635,8 @@ summary {
 
 
 <h1 class="title toc-ignore">Download GDSC, CTRP, and TCGA Data</h1>
+<h4 class="author">Robert F. Gruener</h4>
+<h4 class="date">date last edited: 07 May, 2020</h4>
 
 </div>
 
@@ -1649,7 +1652,7 @@ summary {
 </ul>
 <p>Important note, certain other files are needed as well: “pRRophetic_0.5.tar.gz” will be needed to perform the imputations. “All Cell Line Infor.xlsx” , and “Breast_CCL_Subtypes.csv”. Are needed for the TNBC analysis, but those downloads are separate.</p>
 <p>pRRophetic_0.5.tar.gz can be downloaded <a href="https://osf.io/dwzce/?action=download">here</a>. Place this in the repository or change the location of the installation in the first code chunk.</p>
-<p>“All Cell Line Infor.xlsx” , and “Breast_CCL_Subtypes.csv”. Are needed for the TNBC analysis, but those downloads are separate.</p>
+<p>“All Cell Line Info.xlsx” , and “Breast_CCL_Subtypes.csv”. Are needed for the TNBC analysis, but are already placed in the repository.</p>
 <div id="installing-required-packages-prrophetic-must-be-downloaded-and-put-in-wd-or-project-home" class="section level3">
 <h3>Installing required packages (pRRophetic must be downloaded and put in wd or project home)</h3>
 <p>Again to install pRRophetic, it will need to be downloaded and placed in the repo manually/separately.</p>
@@ -1660,21 +1663,16 @@ if (!requireNamespace(&quot;BiocManager&quot;, quietly = TRUE))
 if (!requireNamespace(c(&quot;car&quot;, &quot;ridge&quot;, &quot;preprocessCore&quot;, &quot;genefilter&quot;, &quot;sva&quot;), quietly = TRUE)) 
     BiocManager::install(c(&quot;car&quot;, &quot;ridge&quot;, &quot;preprocessCore&quot;, &quot;genefilter&quot;, &quot;sva&quot;))
 
-#install pRRophetic from tar.gz file (place in repo seperately)
+#install pRRophetic from tar.gz file (must be placed in repo seperately, or the location needs to be changed)
 if (!requireNamespace(&quot;pRRophetic&quot;, quietly = TRUE)) 
-    install.packages(&quot;pRRophetic_0.5.tar.gz&quot;, repos = NULL, type = &quot;source&quot;)</code></pre>
-<pre><code>## Warning: replacing previous import &#39;car::Anova&#39; by &#39;genefilter::Anova&#39; when
-## loading &#39;pRRophetic&#39;</code></pre>
-<pre class="r"><code>#install other packages that will be used in this script
-if (!requireNamespace(c(&quot;qvalue&quot;, &quot;affy&quot;, &quot;GenomicFeatures&quot;, &quot;org.Hs.eg.db&quot;, &quot;biomaRt&quot; , 
-                        &quot;TxDb.Hsapiens.UCSC.hg19.knownGene&quot;, &quot;glmnet&quot;, &quot;gdata&quot;, &quot;tidyverse&quot;, 
-                        &quot;illuminaHumanv4.db&quot;, &quot;broom&quot;, &quot;ggpubr&quot;), quietly = TRUE)) 
-    BiocManager::install(c(&quot;qvalue&quot;, &quot;affy&quot;, &quot;GenomicFeatures&quot;, &quot;org.Hs.eg.db&quot;, &quot;biomaRt&quot; , 
-                        &quot;TxDb.Hsapiens.UCSC.hg19.knownGene&quot;, &quot;glmnet&quot;, &quot;gdata&quot;, &quot;tidyverse&quot;, 
-                        &quot;illuminaHumanv4.db&quot;, &quot;broom&quot;, &quot;ggpubr&quot;))
+    install.packages(&quot;pRRophetic_0.5.tar.gz&quot;, repos = NULL, type = &quot;source&quot;)
+
+#install other packages that will be used in this project
+req_packages &lt;- c(&quot;readxl&quot;, &quot;TCGAbiolinks&quot;, &quot;tidyverse&quot;, &quot;magrittr&quot;, &quot;ggpubr&quot;, &quot;broom&quot;, &quot;grid&quot;, &quot;ggrepel&quot;, &quot;lsr&quot;, &quot;svglite&quot;)
+needed_packs &lt;- req_packages[!(req_packages %in% installed.packages())]
+if(length(needed_packs)) BiocManager::install(needed_packs)
 
 dir.create(&quot;./DataIn&quot;)</code></pre>
-<pre><code>## Warning in dir.create(&quot;./DataIn&quot;): &#39;.\DataIn&#39; already exists</code></pre>
 </div>
 <div id="downloading-cell-line-data" class="section level3">
 <h3>Downloading Cell Line Data</h3>
@@ -1683,17 +1681,15 @@ dir.create(&quot;./DataIn&quot;)</code></pre>
 <p>Downloading the GDSC2 data from Sanger. Last attempted 5/2020, downloaded data from July 2019 update: Release 8.0.</p>
 <p>NB: Can find the GDSC expression data <a href="https://www.cancerrxgene.org/gdsc1000/GDSC1000_WebResources//Data/preprocessed/Cell_line_RMA_proc_basalExp.txt.zip">at this link</a> However, this information wasn’t updated any since 2016 and the 2016 data is already packaged into this version of pRRophetic as cgp2016ExprRma, so we will just call the data from pRRophetic.(True as of 9/2019)</p>
 <pre class="r"><code>#downloading the GDSC2 8.0 release
-dir.create(&quot;./DataIn/GDSC&quot;)</code></pre>
-<pre><code>## Warning in dir.create(&quot;./DataIn/GDSC&quot;): &#39;.\DataIn\GDSC&#39; already exists</code></pre>
-<pre class="r"><code>download.file(url = &quot;ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/release-8.0/GDSC2_fitted_dose_response_17Jul19.xlsx&quot;,
+dir.create(&quot;./DataIn/GDSC&quot;)
+download.file(url = &quot;ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/release-8.0/GDSC2_fitted_dose_response_17Jul19.xlsx&quot;,
                 destfile = &quot;./DataIn/GDSC/GDSC_IC50_July2019.xlsx&quot;, mode = &quot;wb&quot;)</code></pre>
 <p>Downloads the data from CTRP and CCLE. Data can also be accessed from these links:</p>
 <p>CTRPv2 Data from: <a href="ftp://caftpd.nci.nih.gov/pub/OCG-DCC/CTD2/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/" class="uri">ftp://caftpd.nci.nih.gov/pub/OCG-DCC/CTD2/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/</a> CCLE Data from: <a href="https://portals.broadinstitute.org/ccle/data" class="uri">https://portals.broadinstitute.org/ccle/data</a></p>
-<pre class="r"><code>dir.create(&quot;./DataIn/CTRPv2&quot;)</code></pre>
-<pre><code>## Warning in dir.create(&quot;./DataIn/CTRPv2&quot;): &#39;.\DataIn\CTRPv2&#39; already exists</code></pre>
-<pre class="r"><code>dir.create(&quot;./DataIn/CCLE&quot;)</code></pre>
-<pre><code>## Warning in dir.create(&quot;./DataIn/CCLE&quot;): &#39;.\DataIn\CCLE&#39; already exists</code></pre>
-<pre class="r"><code>#CTRP Data
+<pre class="r"><code>dir.create(&quot;./DataIn/CTRPv2&quot;)
+dir.create(&quot;./DataIn/CCLE&quot;)
+
+#CTRP Data
 temp.zip &lt;- tempfile()
 download.file(url = &quot;ftp://caftpd.nci.nih.gov/pub/OCG-DCC/CTD2/Broad/CTRPv2.0_2015_ctd2_ExpandedDataset/CTRPv2.0_2015_ctd2_ExpandedDataset.zip&quot;,
               &quot;./DataIn/CTRP.zip&quot;) 
@@ -1708,9 +1704,8 @@ download.file(url = &quot;https://data.broadinstitute.org/ccle/CCLE_DepMap_18Q2_
 <div id="downloading-the-tcga-data-from-firebrowse" class="section level3">
 <h3>Downloading the TCGA data from FireBrowse</h3>
 <pre class="r"><code>#this should be updated to the GDC instead of Firebrowse at some point
-dir.create(&quot;./DataIn/TCGA&quot;)</code></pre>
-<pre><code>## Warning in dir.create(&quot;./DataIn/TCGA&quot;): &#39;.\DataIn\TCGA&#39; already exists</code></pre>
-<pre class="r"><code>download.file(&quot;http://gdac.broadinstitute.org/runs/stddata__2015_08_21/data/BRCA/20150821/gdac.broadinstitute.org_BRCA.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2015082100.0.0.tar.gz&quot;, &quot;./DataIn/TCGA/TCGA_BRCA_RNA-seq.tar.gz&quot;)
+dir.create(&quot;./DataIn/TCGA&quot;)
+download.file(&quot;http://gdac.broadinstitute.org/runs/stddata__2015_08_21/data/BRCA/20150821/gdac.broadinstitute.org_BRCA.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2015082100.0.0.tar.gz&quot;, &quot;./DataIn/TCGA/TCGA_BRCA_RNA-seq.tar.gz&quot;)
 untar(&quot;./DataIn/TCGA/TCGA_BRCA_RNA-seq.tar.gz&quot;, exdir = &quot;./DataIn/TCGA/&quot;)
 #having issues with the untar file name being too long, renaming
 file.rename(from = &quot;./DataIn/TCGA/gdac.broadinstitute.org_BRCA.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2015082100.0.0/&quot;, to = &quot;./DataIn/TCGA/RNA-seq&quot; )</code></pre>
@@ -1734,35 +1729,30 @@ file.rename(from = &quot;./DataIn/TCGA/gdac.broadinstitute.org_BRCA.Merge_rnaseq
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] Biobase_2.44.0        bit64_0.9-7           splines_3.6.1        
-##  [4] carData_3.0-2         assertthat_0.2.1      BiocManager_1.30.4   
-##  [7] stats4_3.6.1          blob_1.2.0            ridge_2.4            
-## [10] cellranger_1.1.0      yaml_2.2.0            pillar_1.4.2         
-## [13] RSQLite_2.1.2         backports_1.1.4       lattice_0.20-38      
-## [16] glue_1.3.1            limma_3.40.6          digest_0.6.20        
-## [19] qvalue_2.16.0         colorspace_1.4-1      pRRophetic_0.5       
-## [22] plyr_1.8.4            htmltools_0.3.6       preprocessCore_1.46.0
-## [25] Matrix_1.2-17         XML_3.98-1.20         pkgconfig_2.0.2      
-## [28] haven_2.1.1           genefilter_1.66.0     purrr_0.3.2          
-## [31] xtable_1.8-4          scales_1.0.0          openxlsx_4.1.0.1     
-## [34] rio_0.5.16            BiocParallel_1.17.18  tibble_2.1.3         
-## [37] annotate_1.62.0       mgcv_1.8-28           IRanges_2.18.1       
-## [40] car_3.0-3             ggplot2_3.2.0         BiocGenerics_0.30.0  
-## [43] lazyeval_0.2.2        survival_2.44-1.1     magrittr_1.5         
-## [46] crayon_1.3.4          readxl_1.3.1          memoise_1.1.0        
-## [49] evaluate_0.14         nlme_3.1-140          forcats_0.4.0        
-## [52] foreign_0.8-71        tools_3.6.1           data.table_1.12.2    
-## [55] hms_0.5.0             matrixStats_0.54.0    stringr_1.4.0        
-## [58] S4Vectors_0.22.0      munsell_0.5.0         zip_2.0.3            
-## [61] AnnotationDbi_1.46.0  compiler_3.6.1        rlang_0.4.0          
-## [64] grid_3.6.1            RCurl_1.95-4.12       bitops_1.0-6         
-## [67] rmarkdown_1.14        codetools_0.2-16      gtable_0.3.0         
-## [70] abind_1.4-5           DBI_1.0.0             curl_4.0             
-## [73] reshape2_1.4.3        R6_2.4.0              knitr_1.23           
-## [76] dplyr_0.8.3           bit_1.1-14            zeallot_0.1.0        
-## [79] stringi_1.4.3         parallel_3.6.1        sva_3.32.1           
-## [82] Rcpp_1.0.2            vctrs_0.2.0           tidyselect_0.2.5     
-## [85] xfun_0.8</code></pre>
+##  [1] genefilter_1.66.0     xfun_0.8              ridge_2.4            
+##  [4] lattice_0.20-38       splines_3.6.1         haven_2.1.1          
+##  [7] carData_3.0-2         vctrs_0.2.0           htmltools_0.3.6      
+## [10] stats4_3.6.1          mgcv_1.8-28           yaml_2.2.0           
+## [13] blob_1.2.0            XML_3.98-1.20         survival_2.44-1.1    
+## [16] rlang_0.4.0           pillar_1.4.2          foreign_0.8-71       
+## [19] DBI_1.0.0             BiocParallel_1.17.18  BiocGenerics_0.30.0  
+## [22] bit64_0.9-7           readxl_1.3.1          matrixStats_0.54.0   
+## [25] sva_3.32.1            stringr_1.4.0         cellranger_1.1.0     
+## [28] zip_2.0.3             codetools_0.2-16      evaluate_0.14        
+## [31] memoise_1.1.0         Biobase_2.44.0        knitr_1.23           
+## [34] rio_0.5.16            forcats_0.4.0         IRanges_2.18.1       
+## [37] curl_4.0              parallel_3.6.1        AnnotationDbi_1.46.0 
+## [40] preprocessCore_1.46.0 Rcpp_1.0.2            xtable_1.8-4         
+## [43] backports_1.1.4       BiocManager_1.30.4    limma_3.40.6         
+## [46] S4Vectors_0.22.0      annotate_1.62.0       abind_1.4-5          
+## [49] bit_1.1-14            hms_0.5.0             digest_0.6.20        
+## [52] stringi_1.4.3         openxlsx_4.1.0.1      grid_3.6.1           
+## [55] tools_3.6.1           bitops_1.0-6          magrittr_1.5         
+## [58] pRRophetic_0.5        RCurl_1.95-4.12       tibble_2.1.3         
+## [61] RSQLite_2.1.2         crayon_1.3.4          car_3.0-3            
+## [64] pkgconfig_2.0.2       zeallot_0.1.0         Matrix_1.2-17        
+## [67] data.table_1.12.2     rmarkdown_1.14        nlme_3.1-140         
+## [70] compiler_3.6.1</code></pre>
 </div>
 </div>
 

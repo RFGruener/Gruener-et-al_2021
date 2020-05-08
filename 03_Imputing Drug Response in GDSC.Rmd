@@ -3,31 +3,30 @@ title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug 
 output: html_notebook 
 author:
   - "Robert F. Gruener"
-date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')` "
 ---
-
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
 ### Objectives
 
-Do the imputations
-
+As a cross-database-validation, the goals are to compare imputed results from CTRP with measured results from GDSC. To do this: 
  * Set the parameters
  * Load the GDSC test expression data
  * Load the CTRP/CCLE Training expression and drug data
  * Generate the models and impute using the pRRophetic framework
 
-Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. Also, could run this and get results for any drug in CTRP or all of them if line 99 (possibleDrugs <- ...) is changed. 
+Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. 
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
 ```
 
 ### First, load packages and set parameters
 ```{r loading packages and setting parameters, results= "hide"}
 set.seed(12345)
 #Loading Packages
-needed_packages <- c("tidyverse", "qvalue", "affy", "GenomicFeatures", "org.Hs.eg.db", "TxDb.Hsapiens.UCSC.hg19.knownGene", 
-                     "parallel", "biomaRt", "readxl", 
-                     "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
+needed_packages <- c("tidyverse", "readxl", "glmnet", "gdata", "illuminaHumanv4.db" ,"car", "ridge", "preprocessCore", "genefilter", "sva", "pRRophetic")
 lapply(needed_packages, require, character.only = TRUE)
 
 ###################### Set Parameters ##########################
@@ -35,7 +34,7 @@ lapply(needed_packages, require, character.only = TRUE)
 # Set location and filename  for list/matrix R.data output 
 dir.create("DataOut")
 #list_output_name <- "./DataOut/CTRPbreastcancerPREDS.RData" #we won't be using the list, but you can save it if you so choose 
-matrix_output_name <- "./DataOut/TopTNBC_CTRP_in_GDSC.Rdata"
+matrix_output_name <- "./DataOut/CTRP-models_in_GDSC.Rdata"
 
 # Finally, set parameters of pRRophetic's calcphenotype function 
 #batchCorrect options: "eb" for ComBat, "qn" for quantiles normalization, "standardize", or "none"
@@ -56,37 +55,19 @@ printOutput = TRUE
 
 ```
 
-### Second, load the RNA-Seq data
+### Second, GDSC expression data
 
 ```{r Load RNA-Seq}
 ############ Load Test Expression data (as Matrix) ###################
 
-##### load the GDSC data and format:
-data(cgp2016ExprRma)
- cgp2016ExprRma <- cgp2016ExprRma[, ! is.na(colnames(cgp2016ExprRma))]
-    table(is.na(colnames(cgp2016ExprRma)))
-  #Getting new dups without NA columns
-    table(duplicated(colnames(cgp2016ExprRma))) #49 duplicates
-    exp.dups <- unique(colnames(cgp2016ExprRma)[duplicated(colnames(cgp2016ExprRma))])
-  #Seeing how well gene expression correlates in these duplicates, commented out code would show they correlate well
-    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[1]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[1]][,2])
-    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[2]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[2]][,2])
-    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[3]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[3]][,2])
-    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[4]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[4]][,2])
-  ##Strong correlations between them all. Averaging them together.
-  #Removing dups
-    GDSC_2016_Expression_Data <- cgp2016ExprRma[,! colnames(cgp2016ExprRma) %in% exp.dups]
-  #Adding back averaged dups
-    for(i in 1:length(exp.dups)){
-      GDSC_2016_Expression_Data <- cbind(GDSC_2016_Expression_Data, rowMeans(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[i]]))
-      colnames(GDSC_2016_Expression_Data)[ncol(GDSC_2016_Expression_Data)] <- exp.dups[i]
-    }
-    testExprData <- GDSC_2016_Expression_Data
+GDSC_2016_Expression_Data <- read.delim("./DataIn/GDSC/GDSC_2016expression_clean.txt", sep = "\t", stringsAsFactors = F)    
+
+testExprData <- GDSC_2016_Expression_Data
     colnames(testExprData) <- paste(colnames(GDSC_2016_Expression_Data), "test", sep = "_") #The Test expression dataset cannot have the same names as the traning expression dataset, so adding "test" prevents that. The imputation framework below only does batch correction across all the cell lines; luckily, the models are built for every test subject separately and independently. That is, we can still perform an analysis of non-overlapping cell lines even if we impute in all. We will impute in all the cell lines then because of this and since the overlap is coming from two completely independent datasets. 
 
 ```
 
-### Third, perform Imputations:
+### Third, load CTRP training data
 
 Create models using CTRP for imputations in the GDSC RNA-Seq as test expression
 
@@ -99,6 +80,22 @@ start.with.number <- grep("^[[:digit:]]", CTRPv2_AUC$CCL_Name)
 CTRPv2_AUC$CCL_Name[start.with.number] <- paste("X", CTRPv2_AUC$CCL_Name[start.with.number], sep = "")
 trainingPhenData <- CTRPv2_AUC
 
+#Load Training Expression data, convert it to a matrix
+CTRPv2_RNAseq_TPM <- read.delim("./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt",  sep = "\t", stringsAsFactors = F)
+convert.to.matrix <- function(df){
+  mat <- as.matrix(df[,-1])
+  rownames(mat) <- c(t(df[,1]))
+  return(mat)
+  }
+ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
+```
+
+
+### Fourth, determine drug overlap
+
+There is no point in performing the imputations on all the CTRP drugs since we are only interested in the overlap between GDSC and CTRP. 
+
+```{r Find overlap between CTRP and GDSC}
 top_TNBC_drugs <- read_csv("./DataOut/Top_compounds.csv") 
 drug_targets <- read_csv("./Included_Data/Drug_targets(review).csv") %>% 
   filter(Database == "GDSC") %>% 
@@ -109,14 +106,13 @@ TNBC_drugs_in_GDSC <- inner_join(top_TNBC_drugs, drug_targets)
 
 possibleDrugs <- c("MK-1775", TNBC_drugs_in_GDSC$Drug) #here, I only impute for AZD-1775 because it is the only one I present in the paper. To get the values on all 545 drugs in CTRP, use the unique(trainingPhenData$cpd_name) instead
 
-#Load Training Expression data, convert it to a matrix
-CTRPv2_RNAseq_TPM <- read.delim("./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt",  sep = "\t", stringsAsFactors = F)
-convert.to.matrix <- function(df){
-  mat <- as.matrix(df[,-1])
-  rownames(mat) <- c(t(df[,1]))
-  return(mat)
-  }
-ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
+```
+
+
+### Fifth, perform imputations
+
+
+```{r Do the imputations, cache= TRUE, autodep= TRUE}
 #make a list of all possible drugs predictions
 
 keep(ExprData, possibleDrugs, trainingPhenData, testExprData, batchCorrect, powerTransformPhenotype, 

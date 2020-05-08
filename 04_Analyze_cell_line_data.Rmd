@@ -5,8 +5,9 @@ author:
   - "Robert F. Gruener"
 date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
-
-
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
 
 ```{r Analysis on every individual experiment}
 library(tidyverse)
@@ -88,7 +89,7 @@ print(
 ###AZD-1775 only, no combination analysis
 
 
-```{r Analysis on every individual experiment}
+```{r Analysis on every individual experiment 2}
 
 files <- dir("./DataIn/My Cell Line Data/")
 broken_string <- sapply(str_split(files, "_|\\."), '[', c(2,3,4))

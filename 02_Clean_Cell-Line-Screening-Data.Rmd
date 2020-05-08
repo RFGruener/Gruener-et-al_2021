@@ -1,29 +1,30 @@
 ---
 title: "Cleaning Screening Data"
-output: html_notebook
 author:
-  - "Robert F. Gruener"
+- Robert F. Gruener
+- Alex Ling
 date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
 ---
-
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
 ## Objectives:
 
-The goal of this file is to clean the GDSC and CTRP data files
+The goal of this file:
 
 * Clean and harmonize CTRP phenotype files and CCLE RNA-Seq Files
+* Clean the GDSC expression data (already in the pRRophetic package)
 
-As mentioned previously, I checked the most recent GDSC data (on 8/20/2019) and the 2016 expression data already in the pRRophetic package and they were identical, so I choose just to run with that. 
-    
-    
-Also, note, here the script acts on duplicated geneIDs (removes them for CTRP). Technically the  pRRopheticpredict function from pRRophetic has an option to do that (defaults to averaging, but can remove them)
+Also, note, here the script acts on duplicated geneIDs (removes them for CTRP). Technically this can be done with options in the pRRophetic package, but here it is done explictely for clarity
 
-```{r, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
-```
 
 ```{r Load Packages and Read in the Data}
 library(tidyverse)
 library(readxl)
+library(pRRophetic)
 #Read in CTRPv2 Data (AUC data, compound info, cell line info, and experiment info) 
 CTRPv2_AUC <- read_delim("./DataIn/CTRPv2/v20.data.curves_post_qc.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
 CTRPv2_cpd <- read_delim("./DataIn/CTRPv2/v20.meta.per_compound.txt", "\t", escape_double = FALSE, trim_ws = TRUE)
@@ -38,14 +39,13 @@ All_Cell_Line_Info <- read_excel(path = "Included_Data/All Cell Line Info.xlsx")
 All_Cell_Line_Info <- All_Cell_Line_Info %>% 
   dplyr::select("Cell_ID" = "Harmonized Identifier", "Cell_Line_Name" = `Study Cell Line Name`, Dataset)
 
-
 ```
 
 
 The CTRP data has IDs for cell lines and compounds, this will match the AUC values with the cell line and compound names
 
 
-```{r Formating AUC Data}
+```{r Formating AUC Data, dependson= 2}
 #Orignally written by Alex Ling, slightly modified
 #Matching AUC values with the cell line and drug names they belong to
   #Cell line names
@@ -115,10 +115,10 @@ The CTRP data has IDs for cell lines and compounds, this will match the AUC valu
     
 ```
 
+#### Then clean the CCLE RNA-Seq data
+Also, note, here the script acts on duplicated geneIDs (either averages them for GDSC or removes them for CTRP), but pRRophetic predict has an option to do that (defaults to averaging)
 
-Then clean the CCLE RNA-Seq data
-
-```{r CCLE RNA-Seq Cleaning}
+```{r CCLE RNA-Seq Cleaning, dependson= 2}
 
   #Formating expression data
       CCLE_RNAseq <- CCLE_RNAseq_081117_rpkm[complete.cases(CCLE_RNAseq_081117_rpkm),]
@@ -195,6 +195,39 @@ Then clean the CCLE RNA-Seq data
   #Save File
       write.table(CTRPv2_RNAseq.tpm, "./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt", sep = "\t", quote = F, row.names = T, col.names = NA)
 ```
+
+
+#### Clean the GDSC Expression data in pRRophetic
+
+```{r Load GDSC RMA microarray data, dependson=2}
+############ Load Test Expression data (as Matrix) ###################
+##### load the GDSC data and format:
+data(cgp2016ExprRma)
+ cgp2016ExprRma <- cgp2016ExprRma[, ! is.na(colnames(cgp2016ExprRma))]
+    table(is.na(colnames(cgp2016ExprRma)))
+  #Getting new dups without NA columns
+    table(duplicated(colnames(cgp2016ExprRma))) #49 duplicates
+    exp.dups <- unique(colnames(cgp2016ExprRma)[duplicated(colnames(cgp2016ExprRma))])
+  #Seeing how well gene expression correlates in these duplicates, commented out code would show they correlate well
+    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[1]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[1]][,2])
+    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[2]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[2]][,2])
+    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[3]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[3]][,2])
+    # cor(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[4]][,1], cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[4]][,2])
+  ##Strong correlations between them all. Averaging them together.
+  #Removing dups
+    GDSC_2016_Expression_Data <- cgp2016ExprRma[,! colnames(cgp2016ExprRma) %in% exp.dups]
+  #Adding back averaged dups
+    for(i in 1:length(exp.dups)){
+      GDSC_2016_Expression_Data <- cbind(GDSC_2016_Expression_Data, rowMeans(cgp2016ExprRma[,colnames(cgp2016ExprRma) %in% exp.dups[i]]))
+      colnames(GDSC_2016_Expression_Data)[ncol(GDSC_2016_Expression_Data)] <- exp.dups[i]
+    }
+
+write.table(GDSC_2016_Expression_Data, "./DataIn/GDSC/GDSC_2016expression_clean.txt", sep = "\t", quote = F, row.names = T, col.names = NA)
+
+
+```
+
+
 
 ```{r}
 print(sessionInfo())

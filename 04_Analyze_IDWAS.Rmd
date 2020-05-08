@@ -5,6 +5,10 @@ author:
   - "Robert F. Gruener"
 date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
+
 
 Now that we have a drug list, we can identify what pathways these drugs target. The list indicates that cell cycle is the most prominent pathway targeted. 
 

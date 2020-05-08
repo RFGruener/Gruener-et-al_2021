@@ -5,6 +5,9 @@ author:
   - "Robert F. Gruener"
 date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
 
 Analysis outline: 
 
@@ -13,10 +16,6 @@ Analysis outline:
   * Perform t-tests and correct for multiple testing 
   * Graph results for AZD-1775
   
-
-```{r, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, message = FALSE)
-```
 
 
 ```{r install packages, include= FALSE}

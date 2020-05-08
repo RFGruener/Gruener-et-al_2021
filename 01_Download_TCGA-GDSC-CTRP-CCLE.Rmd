@@ -7,7 +7,9 @@ author:
   - "Robert F. Gruener"
 date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
-
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
 ## Objectives:
 
 The goal of this file is to: download and install the necessary packages and files into the R project. Specifically: 
@@ -21,11 +23,7 @@ Important note, certain other files are needed as well: "pRRophetic_0.5.tar.gz" 
 
 pRRophetic_0.5.tar.gz can be downloaded [here](https://osf.io/dwzce/?action=download). Place this in the repository or change the location of the installation in the first code chunk. 
 
-"All Cell Line Infor.xlsx" , and  "Breast_CCL_Subtypes.csv". Are needed for the TNBC analysis, but those downloads are separate.  
-
-```{r, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = F, cache = T)
-```
+"All Cell Line Info.xlsx" , and  "Breast_CCL_Subtypes.csv". Are needed for the TNBC analysis, but are already placed in the repository.  
 
 
 ### Installing required packages (pRRophetic must be downloaded and put in wd or project home)
