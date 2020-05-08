@@ -56,25 +56,18 @@ printOutput = TRUE
 
 ```
 
-### Second, load the RNA-Seq data
+### Second, load the TCGA RNA-Seq data, remove normal samples
 
 ```{r Load RNA-Seq}
 ############ Load Test Expression data (as Matrix) ###################
+tpmDatMat_tpm_logged <- read.delim("./DataIn/TCGA/TCGA_Breast_TPM.txt", sep = "\t", stringsAsFactors = F)
 
-# load  the breast cancer RNA-seq file downloaded previously
-tpmDatMat <- read.delim(file = "./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt", as.is=T)
-tpmDatMat_tpm <- tpmDatMat[-1,which(tpmDatMat[1,] == "scaled_estimate")]
-tpmDatMat_tpm <- apply(tpmDatMat_tpm, 2, as.numeric)
-geneNames <- do.call(cbind, strsplit(tpmDatMat[, "Hybridization.REF"], "|", fixed=TRUE))[1,][-1]
-rownames(tpmDatMat_tpm) <- geneNames
-colnames(tpmDatMat_tpm) <- substr(colnames(tpmDatMat_tpm), 1, 28)
-tpmDatMat_tpm_logged <- log((tpmDatMat_tpm*1000000)+1) # transform the data
 #remove adjacent normal RNA-seq samples
 testExprData <- tpmDatMat_tpm_logged[,-grep(pattern = ".11A.|.11B.|.10A.|.10B.", colnames(tpmDatMat_tpm_logged))]
 
 ```
 
-### Third, load and clean the CTRP/CCLE data:
+### Third, load and edit the CTRP/CCLE data:
 
 Perform imputations using CTRP/CCLE datasets as the training dataset
 
@@ -86,7 +79,6 @@ CTRPv2_AUC <- read.delim("./DataIn/CTRPv2/CTRPv2_AUC_clean.txt", sep = "\t", str
 start.with.number <- grep("^[[:digit:]]", CTRPv2_AUC$CCL_Name)
 CTRPv2_AUC$CCL_Name[start.with.number] <- paste("X", CTRPv2_AUC$CCL_Name[start.with.number], sep = "")
 trainingPhenData <- CTRPv2_AUC
-#names(trainingPhenData)[names(trainingPhenData)== "cpd_name"] <- "Drug.name"
 possibleDrugs <- unique(trainingPhenData$cpd_name)
 
 #Load Training Expression data, convert it to a matrix
