@@ -1,9 +1,10 @@
 ---
-title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug response in GDSC cell lines'
-output: html_notebook 
-author:
-  - "Robert F. Gruener"
-date: "date last edited: `r format(Sys.time(), '%d %B, %Y')` "
+title: "Build models using the CCLE/CTRPv2 datasets to impute drug response in GDSC cell lines"
+author: "Robert F. Gruener"
+output:
+  html_document:
+    df_print: paged
+date: "date last edited: `r format(Sys.time(), '%d %B, %Y')`"
 ---
 ```{r, include=FALSE}
 knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
