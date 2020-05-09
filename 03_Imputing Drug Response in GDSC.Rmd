@@ -18,10 +18,6 @@ As a cross-database-validation, the goals are to compare imputed results from CT
 
 Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. 
 
-```{r, include=FALSE}
-knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
-```
-
 ### First, load packages and set parameters
 ```{r loading packages and setting parameters, results= "hide"}
 set.seed(12345)
@@ -52,6 +48,11 @@ selection <- 1
 #printoutput: should it print outputs, default is TRUE
 printOutput = TRUE
 
+convert.to.matrix <- function(df){
+  mat <- as.matrix(df[,-1])
+  rownames(mat) <- c(t(df[,1]))
+  return(mat)
+  }
 
 ```
 
@@ -63,7 +64,10 @@ printOutput = TRUE
 GDSC_2016_Expression_Data <- read.delim("./DataIn/GDSC/GDSC_2016expression_clean.txt", sep = "\t", stringsAsFactors = F)    
 
 testExprData <- GDSC_2016_Expression_Data
-    colnames(testExprData) <- paste(colnames(GDSC_2016_Expression_Data), "test", sep = "_") #The Test expression dataset cannot have the same names as the traning expression dataset, so adding "test" prevents that. The imputation framework below only does batch correction across all the cell lines; luckily, the models are built for every test subject separately and independently. That is, we can still perform an analysis of non-overlapping cell lines even if we impute in all. We will impute in all the cell lines then because of this and since the overlap is coming from two completely independent datasets. 
+colnames(testExprData) <- paste(colnames(GDSC_2016_Expression_Data), "test", sep = "_") 
+#The Test expression dataset cannot have the same names as the traning expression dataset. However, cell line names (colnames) will overlap between GDSC and CTRP, so adding "test" to the column names prevents this issue. The imputation framework below only does batch correction across all the cell lines; luckily, the models are built for every test subject separately and independently. That is, we can still perform an analysis of non-overlapping cell lines even if we impute in all. Additionally, the expression data is coming from two completely independent datasets. For these 2 reasons, we will impute in all the cell lines even if they overlap with CTRP. 
+
+testExprData <- convert.to.matrix(testExprData)
 
 ```
 
@@ -82,11 +86,7 @@ trainingPhenData <- CTRPv2_AUC
 
 #Load Training Expression data, convert it to a matrix
 CTRPv2_RNAseq_TPM <- read.delim("./DataIn/CTRPv2/CTRPv2_RNAseq_TPM_clean.txt",  sep = "\t", stringsAsFactors = F)
-convert.to.matrix <- function(df){
-  mat <- as.matrix(df[,-1])
-  rownames(mat) <- c(t(df[,1]))
-  return(mat)
-  }
+
 ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
 ```
 
@@ -96,15 +96,20 @@ ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
 There is no point in performing the imputations on all the CTRP drugs since we are only interested in the overlap between GDSC and CTRP. 
 
 ```{r Find overlap between CTRP and GDSC}
-top_TNBC_drugs <- read_csv("./DataOut/Top_compounds.csv") 
-drug_targets <- read_csv("./Included_Data/Drug_targets(review).csv") %>% 
-  filter(Database == "GDSC") %>% 
-  dplyr::select(`Harmonized Name`, GDSC_name = `Name in Database`) 
 
-TNBC_drugs_in_GDSC <- inner_join(top_TNBC_drugs, drug_targets)
+GDSC_drugs <- read_xlsx("./DataIn/GDSC/GDSC_IC50_July2019.xlsx")
 
+GDSC_drugs_vec <- unique(GDSC_drugs$DRUG_NAME)
+harmonizing_dataset <- read_csv("./Included_Data/Drug_targets(review).csv")
 
-possibleDrugs <- c("MK-1775", TNBC_drugs_in_GDSC$Drug) #here, I only impute for AZD-1775 because it is the only one I present in the paper. To get the values on all 545 drugs in CTRP, use the unique(trainingPhenData$cpd_name) instead
+harm_GDSC_drug_vec <- unique(harmonizing_dataset$`Harmonized Name`[harmonizing_dataset$`Name in Database` %in% GDSC_drugs_vec])
+
+CTRP_names_overlap_with_GDSC <- harmonizing_dataset %>% 
+  filter(Database == "CTRPv2") %>% 
+  filter(`Harmonized Name` %in% harm_GDSC_drug_vec) %>% 
+  .$`Name in Database`
+
+possibleDrugs <- CTRP_names_overlap_with_GDSC #here, I only impute for AZD-1775 because it is the only one I present in the paper. To get the values on all 545 drugs in CTRP, use the unique(trainingPhenData$cpd_name) instead
 
 ```
 
@@ -116,7 +121,7 @@ possibleDrugs <- c("MK-1775", TNBC_drugs_in_GDSC$Drug) #here, I only impute for 
 #make a list of all possible drugs predictions
 
 keep(ExprData, possibleDrugs, trainingPhenData, testExprData, batchCorrect, powerTransformPhenotype, 
-     removeLowVaringGenesFrom, minNumSamples, selection, printOutput, removeLowVaryingGenes, sure = TRUE)
+     removeLowVaringGenesFrom, minNumSamples, selection, printOutput, removeLowVaryingGenes, matrix_output_name, sure = TRUE)
 CTRPDrugPredictions <- list()
 
 

@@ -97,7 +97,7 @@ ExprData <- convert.to.matrix(CTRPv2_RNAseq_TPM)
 
 ### Do the actual imputations 
 
-```{r}
+```{r, autodep= TRUE}
 #make a list of all possible drugs predictions
 CTRPDrugPredictions <- list()
 
