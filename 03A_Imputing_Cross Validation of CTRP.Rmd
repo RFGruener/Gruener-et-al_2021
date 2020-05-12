@@ -15,7 +15,7 @@ Do the imputations
  * Load the CTRP/CCLE Training expression and drug data
  * Run the cross-validation 
 
-Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. 
+
 
 ```{r, include=FALSE}
 knitr::opts_chunk$set(message = F, warning = F, cache = T)

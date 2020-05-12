@@ -110,7 +110,7 @@ CTRP_names_overlap_with_GDSC <- harmonizing_dataset %>%
   filter(`Harmonized Name` %in% harm_GDSC_drug_vec) %>% 
   .$`Name in Database`
 
-possibleDrugs <- CTRP_names_overlap_with_GDSC #here, I only impute for AZD-1775 because it is the only one I present in the paper. To get the values on all 545 drugs in CTRP, use the unique(trainingPhenData$cpd_name) instead
+possibleDrugs <- CTRP_names_overlap_with_GDSC 
 
 ```
 

@@ -35,7 +35,7 @@ lapply(needed_packages, require, character.only = TRUE)
 # Set location and filename  for list/matrix R.data output (ctrp_list_output_name, ctrp_mat_output_name)
 
 dir.create("DataOut")
-#matrix_output_name <- "./DataOut/2015CTRP-Models_on_TCGA_BRCA.RData"
+matrix_output_name <- "./DataOut/2015CTRP-Models_on_TCGA_BRCA.RData"
 
 # Finally, set parameters of pRRophetic's calcphenotype function 
 #batchCorrect options: "eb" for ComBat, "qn" for quantiles normalization, "standardize", or "none"
@@ -49,7 +49,7 @@ removeLowVaringGenesFrom <- "homogenizeData"
 #minNumSamples: minimum number of training samples, set to 30, but this shouldn't be an issue since the there are many samples 
 minNumSamples = 30
 #selection: how to deal with duplicated gene IDs, -1 for ask user, 1 for summarize by mean, 2 for disregard duplicates
-selection <- 1
+selection <- 1 #based on how we cleaened the data, there shouldn't be any duplicates to deal with
 #printoutput: should it print outputs, default is TRUE
 printOutput = TRUE
 
