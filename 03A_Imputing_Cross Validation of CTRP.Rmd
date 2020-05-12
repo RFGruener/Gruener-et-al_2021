@@ -1,5 +1,5 @@
 ---
-title: 'Imputations: Build models using the CCLE/CTRPv2 datasets to impute drug response in TCGA BRCA Tumors'
+title: '20-Fold Cross-validation on CTRP-models'
 output: html_notebook 
 author:
   - "Robert F. Gruener"
@@ -18,7 +18,7 @@ Do the imputations
 Important: Set the parameters appropriately, then everything else *should* run smoothly if you run the enitre file. 
 
 ```{r, include=FALSE}
-knitr::opts_chunk$set(echo = T, results = "hide", message = "hide")
+knitr::opts_chunk$set(message = F, warning = F, cache = T)
 ```
 
 ### First, load packages and set parameters
@@ -39,17 +39,8 @@ lapply(needed_packages, require, character.only = TRUE)
 
 ```{r Load RNA-Seq}
 ############ Load Test Expression data (as Matrix) ###################
-
 # load  the breast cancer RNA-seq file downloaded previously
-tpmDatMat <- read.delim(file = "./DataIn/TCGA/RNA-seq/BRCA.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt", as.is=T)
-tpmDatMat_tpm <- tpmDatMat[-1,which(tpmDatMat[1,] == "scaled_estimate")]
-tpmDatMat_tpm <- apply(tpmDatMat_tpm, 2, as.numeric)
-geneNames <- do.call(cbind, strsplit(tpmDatMat[, "Hybridization.REF"], "|", fixed=TRUE))[1,][-1]
-rownames(tpmDatMat_tpm) <- geneNames
-colnames(tpmDatMat_tpm) <- substr(colnames(tpmDatMat_tpm), 1, 28)
-tpmDatMat_tpm_logged <- log((tpmDatMat_tpm*1000000)+1) # transform the data
-#remove adjacent normal RNA-seq samples
-testExprData <- tpmDatMat_tpm_logged[,-grep(pattern = ".11A.|.11B.|.10A.|.10B.", colnames(tpmDatMat_tpm_logged))]
+tpmDatMat_tpm_logged <- read.delim(file = "./DataIn/TCGA/TCGA_Breast_TPM.txt", as.is=T)
 
 ```
 
@@ -142,93 +133,6 @@ colnames(m) <- c("Drug", "N_CCLs","RMSE", "Spearman_Correlation" , "Spearman_Pva
 write.csv(m, file = "./DataOut/20FoldCV_CTRP.csv")
 ```
 
-
-```{r CV analysis}
-cv <- as_tibble(m) %>% type_convert()
-
-CTRP_5CV <- read.delim(file = "E:/Research_Repos/1_git_repos/pRRophetic_plus/b_scripts-and-results/03_Model_testing_CV/Getting-good-predictions/CV_vs_AvgAUC/b. data_in/CTRPv2_RNAseq-TPM_5fold-CV.txt", sep = "\t")
-
-cv %>% 
-  ggplot(aes(x = Spearman_Correlation)) + 
-  geom_histogram()
-
-CTRP_5CV %>% 
-  ggplot(aes(x = Spearman_Cor)) + 
-  geom_histogram()
-
-left_join(cv, CTRP_5CV, by = c("Drug" = "Compound")) %>% 
-  ggplot(aes(x = Spearman_Correlation, y = Spearman_Cor)) +
-  geom_point() + 
-  geom_abline(slope = 1)
-
-#as we can tell, there isn't really any difference between this and the old results
-
-```
-
-
-```{r cv and ncells}
-
-cv %>% 
-  ggplot(aes(x = N_CCLs, y = Spearman_Correlation)) +
-  geom_point() + 
-  theme_bw()
-
-cv %>% 
-  ggplot(aes(x = N_CCLs, y = Pearson_Correlation)) +
-  geom_point() + 
-  theme_bw()
-
-```
- 
-Not quite what I expected
-
-```{r cv cutoff}
-
-cv %>% 
-  mutate(log10SpearP = log10(Spearman_Pvalue)) %>% 
-  ggplot(aes(x = -log10SpearP)) + 
-    geom_histogram() + 
-    geom_vline(xintercept = -log10(0.05))
-  
-cv %>% 
-  mutate(FDR_Spearman = p.adjust(p = Spearman_Pvalue, method = "fdr")) %>% 
-  mutate(log10FDR_SpearmanP = log10(FDR_Spearman)) %>% 
-  ggplot(aes(x = -log10FDR_SpearmanP)) + 
-    geom_histogram() + 
-    geom_vline(xintercept = -log10(0.05), color = "red")
-
-cv %>% 
-  count(Spearman_Pvalue < 0.05)
-
-cv %>% 
-  mutate(FDR_Spearman = p.adjust(p = Spearman_Pvalue, method = "fdr")) %>% 
-  count(FDR_Spearman < 0.05 )
-
-cv %>% 
-  mutate(FDR_Spearman = p.adjust(p = Spearman_Pvalue, method = "bonferroni")) %>% 
-  mutate(log10FDR_SpearmanP = -log10(FDR_Spearman)) %>% 
-  ggplot(aes(y = log10FDR_SpearmanP, x = Spearman_Correlation)) + 
-    geom_point() + 
-    geom_hline(yintercept = -log10(0.00001))
-
-cv %>% 
-  ggplot(aes(x = Spearman_Correlation, y = Pearson_Correlation)) +
-  geom_point() + 
-  geom_hline(yintercept = 0.25) + 
-  geom_vline(xintercept = 0.25)
-
-cv %>% 
-  ggplot(aes(x = log10(Spearman_Pvalue), y = log10(Pearson_Pvalue))) +
-  geom_point() 
-
-temp <- cv %>% 
-  filter(Spearman_Correlation > 0.1, 
-         Pearson_Correlation > 0.1, 
-         Pearson_Pvalue < 0.01, 
-         Spearman_Pvalue < 0.01)
-
-  
-```
 
 ```{r}
 print(sessionInfo())
