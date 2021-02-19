@@ -1,4 +1,8 @@
-# Gruener-et-al_2019
+# Facilitating Drug Discovery in Breast Cancer by Virtually Screening Patients Using In Vitro Drug Response Modeling
+
+### Gruener et al, 2021 
+#### Published in *Cancers*
+
 Code and project files for our manuscript on imputing drug response in TNBC patients and follow up with the Wee1 Inhibitor AZD1775
 
 
