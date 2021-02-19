@@ -22,12 +22,15 @@ We can go further and use the entire TCGA patient data and find associations bet
 
 library(tidyverse)
 theme_set(theme_bw())
-TCGA_BRCA_muts_idwa <- read_csv("./Included_data/CTRPResults_BRCAonly.csv")
+TCGA_BRCA_muts_idwa <- read_csv("./Included_data/CTRPResults_BRCAonly.csv") #this includes all genes with 5 mutations, which isn't really enough for an GWAS analysis. Filtering for ones with 20+
+
+load("./Included_Data/IDWAS_genes_with_20orMore_muts.Rdata")
 
 IDWAS_results <-  TCGA_BRCA_muts_idwa %>% 
   separate(col = X1, into = c("Drug", "Gene"), sep = "\\.") %>% 
   rename(FDR = `FDR (BH corrected)`) %>% 
-  mutate(logFDR = -log10(FDR))
+  mutate(logFDR = -log10(FDR)) %>% 
+  filter(Gene %in% genes)
 
 IDWAS_results
 ```
@@ -36,12 +39,13 @@ IDWAS_results
 azd_p53<- IDWAS_results %>% 
   filter(Drug == "MK-1775") %>% 
   ggplot(aes(x = logFDR)) + 
+    theme_bw(base_size = 17) +
     geom_histogram(bins = 20, fill = "light blue", color = "black") +
     labs(y = "Number of Associations", 
          x = "Significance (-log10 FDR)") +
     xlim(NA, 48) +
   geom_vline(xintercept = 45.9, color = "red") +
-  annotate(geom = "text", x = 34, y = 200, parse = T, 
+  annotate(geom = "text", x = 35, y = 105, parse = T, size = 4.9, 
            label = as.character(expression(atop("p53-AZD1775 Association", "(red line, FDR = 1.2x10"^{-46}*")"))))
 
 azd_p53
@@ -57,7 +61,7 @@ IDWAS_results %>%
 ```
 
 ```{r}
-ggsave(plot = azd_p53, filename = "./Figures/Figure3b.png")
+ggsave(plot = azd_p53, filename = "./Figures/Figure3b_replace.TIFF", device = "tiff")
 ```
 
 

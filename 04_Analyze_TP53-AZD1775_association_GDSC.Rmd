@@ -1,0 +1,36 @@
+---
+title: "Reviewer Comments: TP53 and AZD-1775 association"
+author: "Robert F Gruener"
+date: "2/4/2021"
+output: html_document
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(warning = F, message = FALSE, cache = T)
+```
+
+```{r load libraries, include= FALSE}
+library(broom)
+library(readxl)
+library(grid)
+library(ggrepel)
+library(tidyverse)
+
+theme_set(theme_bw())
+```
+
+
+```{r}
+ANOVA_GDSC <- read_tsv(file = "./Included_Data/export.tab")
+
+ANOVA_GDSC %>% 
+   mutate(Drug = recode(Drug, "MK-1775" = "AZD-1775")) %>% 
+   mutate(FDR = p.adjust(`P-value`, method = "fdr")) %>% 
+   select(Drug, Target = `Drug Target`, Effect.size = `Effect size`, 
+          p.value = `P-value`, FDR, Number_Altered_Cell_Lines = `No. of altered cell lines`) %>% 
+   mutate(Significant = if_else(FDR < 0.05, "Significant", "NS"),
+          Significant = factor(Significant, levels = c("Significant", "NS"))) %>% 
+   arrange(Significant, Effect.size) %>% 
+   write_csv(file = "DataOut/ST5_TP53_AZD1775_GDSC-ANOVA.csv")
+```
+

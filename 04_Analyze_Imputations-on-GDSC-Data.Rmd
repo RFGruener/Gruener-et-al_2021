@@ -123,7 +123,8 @@ figure4a <- Merge_preds_GDSC.IC50 %>%
     ggpubr::stat_cor(method = "spearman") + 
     labs(title = "Correlation of Imputed and Measured AZD-1775 Sensitivity \n in Cell Lines Unique to GDSC", 
          x = "Imputed Sensitivty Score", 
-         y = "Measured ln(IC50) values from GDSC")
+         y = "Measured ln(IC50) values from GDSC") + 
+    theme_bw(base_size = 14.6)
 figure4a
 figure4a <- figure4a + labs(title = NULL)
 
@@ -194,7 +195,8 @@ fig4b <- overlapping_CCLs %>%
     ggpubr::stat_cor(method = "spearman") + 
     labs(title = "Correlation of Measured CCL Sensitivity to AZD-1775 from GDSC and CTRP", 
          x = "Measured AUC Values from CTRP", 
-         y = "Measured ln(IC50) values from GDSC")
+         y = "Measured ln(IC50) values from GDSC") + 
+    theme_bw(base_size = 14.6)
 
 fig4b
 fig4b <- fig4b + labs(title = NULL)
@@ -274,8 +276,8 @@ Merge_preds_GDSC.IC50 %>%
 
 ```{r}
 
-ggsave(plot = figure4a, filename = "./Figures/Figure4a.png", width = 6, height = 4)
-ggsave(plot = fig4b, filename = "./Figures/Figure4b.png", width = 6, height = 4)
+ggsave(plot = figure4a, filename = "./Figures/Figure4a.tiff", device = "tiff", width = 6, height = 4)
+ggsave(plot = fig4b, filename = "./Figures/Figure4b.tiff", device = "tiff", width = 6, height = 4)
 
 ggsave(plot = sfig4a, filename = "./Figures/Supplmental_figure4a.png", width = 6, height = 4)
 ggsave(plot = sfig4b, filename = "./Figures/Supplmental_figure4b.png", width = 6, height = 4)

@@ -86,9 +86,10 @@ bad_cv_drugs <- bad_cv_drugs$Drug
 sup1 <- CTRP_cv %>% ggplot(aes(x = Spearman_Correlation)) + 
   geom_histogram() + 
   geom_vline(xintercept = min(cv_cutoff$Spearman_Correlation), color = "red") + 
-  labs(x = "Spearman R from CTRP cross-validation", y = "Number of Drugs")
+  labs(x = "Spearman R from CTRP cross-validation", y = "Number of Drugs") +
+  theme_bw(base_size = 18)
 sup1
-ggsave(plot = sup1, filename = "supplemental_figure_1.png")
+ggsave(plot = sup1, device = "eps", filename = "supplemental_figure_1.eps")
 
 ```
 
@@ -127,6 +128,8 @@ BRCA_preds <- BRCA_preds %>%
 preds.subtype <- left_join(BRCA_preds, BRCA_clinical, by = c("Patient_ID" = "bcr_patient_barcode")) %>% 
   drop_na(TNBC_status, PAM50)
 
+write_csv(preds.subtype, file = "Supplemental_table1.csv")
+
 ```
 
 
@@ -157,14 +160,183 @@ ER_t.tst_preds <- preds.subtype %>%
   do(tidy(t.test(PSS~er_status_by_ihc, data = .))) %>% 
   ungroup() %>% 
   mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
-  arrange(bonf_p.value) %>% 
+  mutate(log10_p.correct = -log10(bonf_p.value)) %>% 
+  arrange(bonf_p.value)
+
+dplyr::filter(ER_t.tst_preds, estimate > 0)
+#ER positivity associates with Imputed Tamoxifen Response, it is the 3th most significant result
+```
+
+
+```{r}
+
+lum_t.tst_preds <- preds.subtype %>%
+  filter(Clin_Subtype %in% c("ER/PR+", "HER2+")) %>% 
+  group_by(Drug) %>% 
+  do(tidy(t.test(PSS~Clin_Subtype, data = .))) %>% 
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
+  mutate(log10_p.correct = -log10(bonf_p.value)) %>% 
+  arrange(bonf_p.value) 
+
+lum_t.tst_preds %>% 
+  filter(estimate < 0) %>% 
+  arrange(desc(log10_p.correct)) %>% 
+  dplyr::slice(1:3) %>% 
+  ggplot(mapping = aes(x = estimate, y = log10_p.correct, label = Drug)) + 
+    geom_point(data = lum_t.tst_preds) +
+    geom_point(color = "red", size = 2.2) + 
+    geom_text_repel(nudge_y = 3) + 
+    labs(y = "-log10(adjusted p-value)", 
+         x = "Mean Difference (Imputed Effect RPBC - TNBC)", 
+         caption = "Drugs More Effective in RPBC                                                                                                            Drugs More Effective in TNBC") + 
+    theme(plot.title = element_text(hjust = 0.5))
+
+lum_t.tst_preds <- preds.subtype %>%
+  filter(Clin_Subtype %in% c("ER/PR+", "TNBC")) %>% 
+  group_by(Drug) %>% 
+  do(tidy(t.test(PSS~Clin_Subtype, data = .))) %>% 
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
+  mutate(log10_p.correct = -log10(bonf_p.value)) %>% 
+  arrange(bonf_p.value)
+
+lum_t.tst_preds %>% 
+  filter(estimate < 0) %>% 
+  arrange(desc(log10_p.correct)) %>% 
+  dplyr::slice(1:3) %>% 
+  ggplot(mapping = aes(x = estimate, y = log10_p.correct, label = Drug)) + 
+    geom_point(data = lum_t.tst_preds) +
+    geom_point(color = "red", size = 2.2) + 
+    geom_text_repel(nudge_y = 3) + 
+    labs(y = "-log10(adjusted p-value)", 
+         x = "Mean Difference (Imputed Effect RPBC - TNBC)", 
+         caption = "Drugs More Effective in RPBC                                                                                                            Drugs More Effective in TNBC") + 
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+lum_t.tst_preds <- preds.subtype %>%
+  filter(Clin_Subtype %in% c("ER/PR+", "HER2+", "TNBC")) %>% 
+  mutate(luminal = grepl("ER/PR+", x = .$Clin_Subtype)) %>% 
+  group_by(Drug) %>% 
+  do(tidy(t.test(PSS~luminal, data = .))) %>% 
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
+  mutate(log10_p.correct = -log10(bonf_p.value)) %>% 
+  arrange(bonf_p.value)
+
+lum_t.tst_preds %>% 
+  filter(estimate < 0) %>% 
+  arrange(desc(log10_p.correct)) %>% 
+  dplyr::slice(1:4) %>% 
+  ggplot(mapping = aes(x = estimate, y = log10_p.correct, label = Drug)) + 
+    geom_point(data = lum_t.tst_preds) +
+    geom_point(color = "red", size = 2.2) + 
+    geom_text_repel(nudge_y = 3) + 
+    labs(y = "-log10(adjusted p-value)", 
+         x = "Mean Difference (Imputed Effect RPBC - TNBC)", 
+         caption = "Drugs More Effective in RPBC                                                                                                            Drugs More Effective in TNBC") + 
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+
+lum_t.tst_preds <- preds.subtype %>%
+  filter(PAM50 %in% c("LumA", "Basal")) %>% 
+  group_by(Drug) %>% 
+  do(tidy(t.test(PSS~PAM50, data = .))) %>% 
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
+  mutate(log10_p.correct = -log10(bonf_p.value)) %>% 
+  arrange(bonf_p.value)
+
+lum_t.tst_preds %>% 
+  filter(estimate > 0) %>% 
+  arrange(desc(log10_p.correct)) %>% 
+  dplyr::slice(1:3) %>% 
+  ggplot(mapping = aes(x = estimate, y = log10_p.correct, label = Drug)) + 
+    geom_point(data = lum_t.tst_preds) +
+    geom_point(color = "red", size = 2.2) + 
+    geom_text_repel(nudge_y = 3) + 
+    labs(y = "-log10(adjusted p-value)", 
+         x = "Mean Difference (Imputed Effect RPBC - TNBC)", 
+         caption = "Drugs More Effective in Basal                                                                                                            Drugs More Effective in Luminal") + 
+    theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r}
+lum_t.tst_preds <- preds.subtype %>%
+  filter(Clin_Subtype %in% c("ER/PR+", "TNBC")) %>% 
+  mutate(Clin_Subtype = factor(Clin_Subtype, levels = c("TNBC", "ER/PR+"))) %>% 
+  group_by(Drug) %>% 
+  do(tidy(t.test(PSS~Clin_Subtype, data = .))) %>% 
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>% 
+  mutate(log10_p.correct = -log10(bonf_p.value)) %>% 
+  arrange(bonf_p.value) 
+
+e_10_cutoff <- sort(lum_t.tst_preds$estimate[lum_t.tst_preds$estimate > 0], 
+                    decreasing = T)[round(sum(lum_t.tst_preds$estimate > 0)*0.1, digits = 0)] 
+p_10_cutoff <- sort(lum_t.tst_preds$bonf_p.value[lum_t.tst_preds$estimate > 0], 
+                    decreasing = F)[round(sum(lum_t.tst_preds$estimate > 0)*0.1, digits = 0)]
+
+top_lum_drugs <- lum_t.tst_preds %>% 
+  filter(estimate > 0, 
+         bonf_p.value < p_10_cutoff)
+
+lum_t.tst_preds %>% 
+  filter(estimate > 0) %>% 
+  arrange(desc(log10_p.correct)) %>% 
+  dplyr::slice(1:11) %>% 
+  ggplot(mapping = aes(x = 1, y = log10_p.correct, label = Drug)) + 
+    geom_point(data = filter(lum_t.tst_preds, estimate > 0)) +
+    geom_point(color = "blue", size = 2.2) + 
+    geom_text_repel(nudge_y = 3) + 
+    labs(y = "-log10(adjusted p-value)", 
+         x = "Mean Difference (Imputed Effect RPBC - TNBC)", 
+         caption = "Drugs More Effective in RPBC                                                                                                            Drugs More Effective in TNBC") + 
+    theme(plot.title = element_text(hjust = 0.5))
+
+
+lum_t.tst_preds %>% 
+  filter(estimate > 0) %>% 
+  mutate(label = if_else(bonf_p.value < p_10_cutoff, Drug, ""),
+         Signific = if_else(bonf_p.value < p_10_cutoff, "Lead", "")) %>% 
+  ggplot(mapping = aes(x = 1, y = log10_p.correct, label = label)) + 
+  geom_point(aes(color = Signific)) + 
+  scale_color_manual(values = c("black", "blue")) + 
+  geom_text_repel(nudge_x = 0.01, force = 3) + 
+  scale_x_continuous(name = "Drugs with Predicted Preferential \nAcitivity in HR+ Breast Cancer", 
+                     limits = c(1, 1.08), breaks = NULL) + 
+    labs(y = "-log10(adjusted p-value)") +
+   theme_classic() +
+    theme(axis.title.x = element_text(hjust = 0),
+          legend.position = "none") 
+    
+  
+  
+
+```
+
+
+```{r HER2 Drugs}
+########### HER2 Drugse#################
+
+
+HER2_t.tst_preds <- preds.subtype %>% 
+  group_by(Drug) %>% 
+  drop_na(er_status_by_ihc) %>% 
+  do(tidy(t.test(PSS~HER2_Subtype, data = .))) %>% 
+  ungroup() %>% 
+  mutate(bonf_p.value = p.adjust(p.value, method = "bonferroni")) %>%
+  mutate(log10_p.correct = -log10(bonf_p.value)) %>% 
+  arrange(log10_p.correct) %>% 
   filter(estimate > 0)
 
-head(ER_t.tst_preds)
+head(HER2_t.tst_preds)
 
 #ER positivity associates with Imputed Tamoxifen Response, it is the 5th most significant result
 ```
-
 
 
 ### Identifying Compounds Predicted To Be More Effective in TNBC
@@ -227,9 +399,16 @@ To visualize the t-test results, we can create a volcano plot and look for the m
 t.tst_preds.subtype %>% 
   arrange(desc(log10_p.correct)) %>% 
   dplyr::slice(1:3) %>% 
+  bind_rows(slice(arrange(filter(t.tst_preds.subtype, estimate < 0),
+                                    desc(log10_p.correct)),
+                            1:2)) %>% 
   ggplot(mapping = aes(x = estimate, y = log10_p.correct, label = Drug)) + 
     geom_point(data = t.tst_preds.subtype) +
-    geom_point(color = "red", size = 2.2) + 
+    geom_point(color = "red", size = 2.2) +
+    geom_point(data = slice(arrange(filter(t.tst_preds.subtype, estimate < 0),
+                                    desc(log10_p.correct)),
+                            1:2), 
+               color = "blue", size = 2.2, mapping = aes(label = Drug)) +
     geom_text_repel(nudge_y = 3) + 
     labs(title = "Volcano Plot of TNBC vs RPBC T-Test Results \n P-values and Estimate Scores for All Drugs", 
          y = "-log10(p.value)", 
@@ -247,13 +426,15 @@ fig2a <- t.tst_preds.subtype %>%
     geom_point(data = t.tst_preds.subtype) +
     geom_point(color = "red", size = 2.2) + 
     geom_text_repel(nudge_y = 3) + 
+    theme_bw(base_size = 16) +
     labs(y = "-log10(adjusted p-value)", 
          x = "Mean Difference (Imputed Effect RPBC - TNBC)", 
-         caption = "Drugs More Effective in RPBC                                                                                                            Drugs More Effective in TNBC") + 
-    theme(plot.title = element_text(hjust = 0.5))
+         caption = c("Drugs More\nEffective in TNBC", " Drugs More\nEffective in RPBC")) + 
+    theme(plot.caption = element_text(hjust=c(1, -0.1))) 
+    
 fig2a
 
-ggsave(filename = "./Figures/Figure2a.png", plot = fig2a, height = 5, width = 7)
+ggsave(filename = "./Figures/Figure2a.TIFF", device = "tiff", plot = fig2a, height = 5.5, width = 7)
     
 ```
 
@@ -281,15 +462,15 @@ targets_t.test
 
 ```
 
-
-
 ```{r top drugs MOA}
 
 #For the table in the text of the paper, I'm going to include only the top 10% based on both effect size and significance, sorted by mechanism of action. Here is roughly what I'll be looking for, some edits in excel may be called for:
 
 #Here I'm more concerned about the top compounds based on effect size and p-value, so find the cutoff based on the ~290 sig drugs
-e_10_cutoff <- sort(abs(t.tst_preds.subtype$estimate), decreasing = T)[34] 
-p_10_cutoff <- sort(abs(t.tst_preds.subtype$bonf_p.value), decreasing = F)[34]
+e_10_cutoff <- sort(t.tst_preds.subtype$estimate, 
+                    decreasing = T)[round(sum(t.tst_preds.subtype$estimate > 0)*0.1, digits = 0)] 
+p_10_cutoff <- sort(abs(t.tst_preds.subtype$bonf_p.value), 
+                    decreasing = F)[round(sum(t.tst_preds.subtype$estimate > 0)*0.1, digits = 0)]
 
 temp_top_targets_t.tst <- targets_t.test %>% 
  filter(estimate > e_10_cutoff,
@@ -388,6 +569,7 @@ box_labs <- preds.subtype %>% #placing the number of patients in each subtype in
 print(                       #graphing function that graphs boxplots with comparisons 
   preds.subtype %>% 
   ggboxplot(x = comparison, y = "PSS", fill = comparison) +
+      theme_bw(base_size = 16) + 
       labs(title = paste(drug, "'s Imputed Sensitivity in TCGA BRCA Cohort by Receptor Status", sep = ""),
            y = "Imputed Sensitivity Score", 
            x = "BRCA Subtype") +
@@ -408,7 +590,7 @@ azd_pam <- Sensitivity_grapher(drug = "AZD-1775", comparison = "PAM50", group = 
        x = "PAM50 Subtype") #need to change the titles and axis when I change groups, may need to change that in the future
 
 #can also look at lapatinib and tamoxifen 
-Sensitivity_grapher(drug = "lapatinib", comparison = "Clin_Subtype", group = "HER2+")
+Sensitivity_grapher(drug = "leptomycin B", comparison = "Clin_Subtype", group = "TNBC")
 
 
 tam_clin <- Sensitivity_grapher(drug = "tamoxifen", comparison = "Clin_Subtype", group = "ER/PR+") 
@@ -421,10 +603,10 @@ tam_pam <- Sensitivity_grapher(drug = "tamoxifen", comparison = "PAM50", group =
 azd_clin <- azd_clin + 
   labs(title = NULL, 
        y = "AZD-1775 Imputed Sensitivity Score",
-       x = "TCGA Patients by Clinical BRCA Subtype")
+       x = "TCGA Patients by Clinical BRCA Subtype") 
 azd_clin
 
-ggsave(filename = "./Figures/Figure2b.png", plot = azd_clin)
+ggsave(filename = "./Figures/Figure2b.tiff", device = "tiff", plot = azd_clin)
 
 
 azd_pam <- azd_pam + 
@@ -433,7 +615,7 @@ azd_pam <- azd_pam +
        x = "TCGA Patients by PAM50 Subtype")
 azd_pam
 
-ggsave(filename = "./Figures/Figure2c.png", plot = azd_pam)
+ggsave(filename = "./Figures/Figure2c.tiff", device = "tiff", plot = azd_pam)
 ```
 
 ```{r Tamoxifen Graphs}
